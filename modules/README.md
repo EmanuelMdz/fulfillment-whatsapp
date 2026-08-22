@@ -32,3 +32,8 @@ que veníamos a evitar.
 | `hours/` | Horario de atención por franja | 3 |
 | `team/` | Asignar casos a personas | 3 |
 | `ads/` | De qué aviso vino el chat | después de la v1 |
+| `instagram/` | Segundo canal: DM de Instagram con una app de Meta por cliente | después de la v1 |
+
+> **Instagram**: antes de construirlo hay que confirmar que una app en modo
+> desarrollo pueda contestarle a gente sin rol en la app. Ver la decisión 8 en
+> `docs/DECISIONES.md`.

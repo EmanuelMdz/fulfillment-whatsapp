@@ -110,3 +110,33 @@ entra como segundo proveedor sin tocar el resto.
 **Por qué.** El puente no oficial tiene riesgo real de bloqueo del número. Que un
 alumno pueda cambiar de transporte sin rehacer el sistema es protección para él y
 una clase entera para vos.
+
+---
+
+## 8. Instagram es un canal más, y es un módulo
+
+**Decisión.** WhatsApp por el puente no oficial va en el núcleo. Instagram entra
+como segundo proveedor, detrás de la misma interfaz, y **queda como módulo
+opcional**.
+
+**Por qué no va en el núcleo.** Conectar WhatsApp es escanear un código QR.
+Conectar Instagram es crear una app en Meta, invitar al cliente como tester, que
+él acepte, pasar por OAuth y sostener tokens que vencen — por cada cliente. Si
+eso está en el camino obligatorio, la mayoría se traba ahí y abandona antes de
+ver el bot contestar una sola vez.
+
+**Lo que ya está resuelto.** La interfaz de proveedores existe desde el diseño
+original, y los prompts se guardan por canal: el índice único de la
+configuración es sobre sección más canal. Un tono distinto para Instagram que
+para WhatsApp no necesita esquema nuevo.
+
+**Lo que hay que verificar ANTES de construir.** El plan es una app de Meta por
+cliente, sin App Review, con el cliente agregado como tester. La documentación se
+contradice: el acceso estándar habla de servir cuentas agregadas en el panel de
+la app, pero la regla de modos de app dice que en desarrollo solo se interactúa
+con quien tiene un rol.
+
+El test que lo resuelve: app creada, cuenta profesional como tester, webhook
+conectado, y **un DM desde un teléfono sin ningún rol en esa app**. Si dispara y
+la respuesta llega, el plan funciona. Si no, hay que ir por App Review y el
+producto cambia. Menos de una hora, y es el paso más barato de todo el proyecto.
