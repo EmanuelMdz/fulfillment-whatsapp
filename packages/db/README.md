@@ -16,7 +16,7 @@ Manualmente, en el editor SQL de Supabase, en orden numérico.
 | Archivo | Qué trae |
 |---|---|
 | `0001_core.sql` | Configuración, módulos, contactos, catálogo, pedidos |
-| `0002_bot.sql` | Conversaciones, mensajes, seguimientos, cola de revisión — llega con la tanda 1 |
+| `0002_bot.sql` | Conversaciones, mensajes, cola de envío, prompts, episodios de aviso |
 
 Numeración única y correlativa. Nunca se edita una migración ya aplicada: se
 agrega la siguiente.

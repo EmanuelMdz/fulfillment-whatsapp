@@ -18,6 +18,22 @@ apenas texto adentro de un prompt.
 
 ## Tanda 1 — Núcleo del bot
 
+### Ya está en pie
+
+El esqueleto que hace que el bot conteste, escrito de cero (no portado):
+
+- [x] Migración `0002_bot.sql`: conversaciones, mensajes, cola de envío, prompts y episodios de aviso
+- [x] Interfaz de proveedores y adaptador de WhatsApp
+- [x] Webhook: guarda el mensaje, detecta que entró un humano y agenda el turno
+- [x] Cola de envío: reclama de a uno, simula que escribe, hace una pausa y manda
+- [x] Turno: espera, verifica que siga siendo el último mensaje, arma el contexto y contesta
+- [x] Acceso al modelo con Gemini y OpenAI detrás de la misma función
+
+**Cómo probarlo**: aplicá las dos migraciones, cargá las claves, apuntá el
+webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
+
+### Lo que falta portar
+
 - [ ] Proveedores, agentes, cola de envío, crons, observabilidad, utilidades — 68 archivos, entran tal cual
 - [ ] `message-processor.ts` (2.024 ln) — portar entero y sacarle los pasos de envío y cobro a puntos de extensión
 - [ ] `knowledge-base.ts` + `kb-render.ts` (587 ln) — generalizar a producto o prestación
@@ -25,7 +41,6 @@ apenas texto adentro de un prompt.
 - [ ] `lead-state.ts` + `echo-handler.ts` — toma y devolución del control humano, tal cual
 - [ ] `notifications/` (443 ln) — avisos idempotentes por episodio, tal cual
 - [ ] `queries.ts` (1.336 ln) — podar lo que no aplica
-- [ ] Migración `0002_bot.sql` con las tablas de conversación
 
 **Listo cuando** el bot contesta un WhatsApp real con prompts cargados desde la
 base, sin una sola línea del negocio de origen.

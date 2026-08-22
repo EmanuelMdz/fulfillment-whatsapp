@@ -3,11 +3,12 @@
  *
  *   1. sirve el panel ya compilado (apps/panel → apps/bot/public)
  *   2. recibe el webhook de WhatsApp
- *   3. expone la API que consume el panel
- *   4. corre los crons (seguimientos, vigilancia de sesión, resumen diario)
+ *   3. vacía la cola de envío, de a uno y con pausas
+ *   4. contesta los turnos que vencieron
  *
- * Por eso NO puede correr en funciones serverless: necesita proceso vivo.
- * Ver docs/DECISIONES.md.
+ * Por eso NO puede correr en funciones serverless, y por eso va con UNA
+ * sola réplica: dos procesos son dos colas mandando en paralelo, y ahí se
+ * pierde la protección del número. Ver docs/DECISIONES.md y docs/DEPLOY.md.
  */
 
 import { serve } from '@hono/node-server'
@@ -18,6 +19,9 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadEnv, hasWhatsapp } from './config/env.js'
 import { healthRoute } from './routes/health.js'
+import { webhookRoute } from './routes/webhook.js'
+import { startSendQueue } from './workers/send-queue.js'
+import { startTurns } from './workers/turns.js'
 
 const env = loadEnv()
 const app = new Hono()
@@ -31,9 +35,9 @@ const hasPanel = existsSync(panelDir)
 
 // ── API ───────────────────────────────────────────────────────
 app.route('/health', healthRoute)
+app.route('/webhook/whatsapp', webhookRoute)
 
-// TODO tanda 1: webhook de WhatsApp
-// TODO tanda 1: rutas de la API del panel
+// TODO tanda 2: rutas del panel (responder como humano, devolver al bot)
 // TODO tanda 2: sesión y QR
 
 // ── Panel ─────────────────────────────────────────────────────
@@ -45,6 +49,10 @@ if (hasPanel) {
 } else {
   app.get('*', (c) => c.text('El panel no está compilado todavía. Corré: npm run build', 503))
 }
+
+// ── Trabajadores ──────────────────────────────────────────────
+startSendQueue()
+startTurns()
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[fw] escuchando en http://localhost:${info.port}`)
