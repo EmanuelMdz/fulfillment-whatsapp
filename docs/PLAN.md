@@ -55,10 +55,12 @@ sistema que anda y un producto que otro puede instalar.
 
 ## Lo que cuesta tenerlo prendido
 
-Servidor siempre encendido, unos siete dólares por mes. Base de datos, gratis
-para empezar. Puente de WhatsApp, a definir según si la versión libre alcanza
-para imágenes y audios. Modelos de IA, centavos por conversación. Y un número de
-WhatsApp dedicado, nunca el personal.
+Servidor siempre encendido en Railway, entre cinco y siete dólares por mes. Base
+de datos, gratis para empezar. Puente de WhatsApp, a definir según si la versión
+libre alcanza para imágenes y audios. Modelos de IA, centavos por conversación. Y
+un número de WhatsApp dedicado, nunca el personal.
+
+El paso a paso para ponerlo en línea está en `DEPLOY.md`.
 
 ## Decisiones abiertas
 

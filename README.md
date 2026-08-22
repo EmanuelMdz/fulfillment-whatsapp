@@ -53,14 +53,16 @@ docs/          el plan, el porteo, las decisiones y el temario
 ## Qué necesita para correr
 
 - Un proyecto de Supabase (uno por instalación)
-- Un servidor Node siempre encendido — **no sirve serverless**, el bot necesita
-  proceso vivo para la cola de envío y los crons
+- Una cuenta de Railway, entre cinco y siete dólares por mes — **no sirve
+  serverless ni un plan que duerma el servicio**: el bot necesita proceso vivo
+  para la cola de envío y los crons. Paso a paso en `docs/DEPLOY.md`
 - Un puente de WhatsApp con su URL y su clave
 - Una clave de un proveedor de modelos de IA
 - Un número de WhatsApp dedicado, nunca el personal
 
 ## Documentación
 
+- `docs/DEPLOY.md` — poner el sistema en línea, paso a paso
 - `docs/PLAN.md` — el plan completo y las tres tandas
 - `docs/PORTEO.md` — qué se trae, de dónde, y en qué estado
 - `docs/DECISIONES.md` — por qué está armado así

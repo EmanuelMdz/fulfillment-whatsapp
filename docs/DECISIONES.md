@@ -30,8 +30,23 @@ los mensajes sueltos, manda todo por una cola global uno por uno con pausas para
 no comerse un bloqueo, corre seguimientos y vigila la sesión de WhatsApp. Nada de
 eso sobrevive en un proceso que arranca y muere por pedido.
 
-**Lo que cuesta.** Unos siete dólares por mes por instalación. Va dicho en la
-página de venta, no se descubre en la clase cuatro.
+**Descartado en el camino.** Vercel: las funciones se despiertan por pedido y se
+mueren, no hay dónde esperar ni dónde sostener la cola. Se podría reescribir todo
+alrededor de un cron que corre cada minuto, pero eso agrega demora a cada
+respuesta y retuerce la pieza más delicada del sistema para que entre donde no
+entra.
+
+**Elegido.** Railway: se conecta el repo de GitHub, detecta que es Node y queda
+corriendo. Sin Docker, sin dominio que configurar. Render sirve igual, con la
+salvedad de que su plan gratuito duerme el servicio y un servicio dormido no
+manda seguimientos.
+
+**Lo que cuesta.** Entre cinco y siete dólares por mes por instalación. Va dicho
+en la página de venta, no se descubre en la clase cuatro.
+
+**Consecuencia que no se puede olvidar.** Una sola réplica. La protección contra
+el bloqueo del número depende de que exista una única cola de envío; dos
+procesos mandando en paralelo la anulan por completo. Ver `DEPLOY.md`.
 
 ---
 
