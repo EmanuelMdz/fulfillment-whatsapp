@@ -18,5 +18,9 @@
     "start": "npm run start --workspace=apps/bot",
     "setup": "node scripts/setup.mjs",
     "type-check": "npm run type-check --workspace=apps/bot"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "pg": "^8.23.0"
   }
 }

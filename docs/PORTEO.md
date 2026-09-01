@@ -69,7 +69,7 @@ base, sin una sola línea del negocio de origen.
 - [ ] Catálogo en el panel (`Products` + `ProductForm` + `Stock` simplificados) + pestaña de pedidos
 - [ ] `Metricas.jsx` — podar
 - [ ] `ProductBotTab.jsx` — la ficha `bot_info` se edita con el catálogo (va junto al punto de arriba)
-- [ ] **Nuevo**: instalador que corra migraciones, siembre y cree el usuario dueño
+- [x] **Nuevo**: instalador completo — corre las migraciones que falten (tabla `_migrations`, una transacción por archivo), escribe la config del pack desde `packages/core`, prende los módulos, siembra el catálogo de ejemplo y crea el usuario dueño. Re-ejecutable sin miedo.
 
 **Listo cuando** alguien que nunca vio el repo clona, corre el instalador,
 escanea el código y responde un mensaje desde el panel en menos de treinta
