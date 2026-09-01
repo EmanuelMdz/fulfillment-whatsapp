@@ -18,7 +18,9 @@ import { existsSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadEnv, hasWhatsapp } from './config/env.js'
+import { requirePanelUser } from './middleware/auth.js'
 import { healthRoute } from './routes/health.js'
+import { panelRoute } from './routes/panel.js'
 import { webhookRoute } from './routes/webhook.js'
 import { startFollowups } from './workers/followups.js'
 import { startSendQueue } from './workers/send-queue.js'
@@ -37,9 +39,8 @@ const hasPanel = existsSync(panelDir)
 // ── API ───────────────────────────────────────────────────────
 app.route('/health', healthRoute)
 app.route('/webhook/whatsapp', webhookRoute)
-
-// TODO tanda 2: rutas del panel (responder como humano, devolver al bot)
-// TODO tanda 2: sesión y QR
+app.use('/api/panel/*', requirePanelUser)
+app.route('/api/panel', panelRoute)
 
 // ── Panel ─────────────────────────────────────────────────────
 // Todo lo que no sea API sale del panel compilado. El comodín al final

@@ -283,7 +283,37 @@ export async function handbackToBot(conversationId: string): Promise<void> {
   if (res.error) throw res.error
 }
 
+/** Cierra la conversación. Si el cliente vuelve a escribir, se reabre sola. */
+export async function closeConversation(conversationId: string): Promise<void> {
+  const res = await db()
+    .from('conversations')
+    .update({ state: 'cerrado', respond_after: null })
+    .eq('id', conversationId)
+  if (res.error) throw res.error
+}
+
+/** ¿Hay mensajes de esta conversación esperando en la cola de envío? */
+export async function hasPendingSends(conversationId: string): Promise<boolean> {
+  const res = await db()
+    .from('send_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .in('status', ['pending', 'sending'])
+  if (res.error) throw res.error
+  return (res.count ?? 0) > 0
+}
+
 // ── Cola de revisión ─────────────────────────────────────────
+
+/** Marca resuelto el caso abierto de esta conversación, si lo hay. */
+export async function resolveOpenReview(conversationId: string): Promise<void> {
+  const res = await db()
+    .from('review_queue')
+    .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('status', 'open')
+  if (res.error) throw res.error
+}
 
 /**
  * Deja la conversación en la bandeja del equipo. Si ya tenía un caso

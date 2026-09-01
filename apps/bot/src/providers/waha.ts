@@ -87,6 +87,52 @@ export class WahaProvider implements MessageProvider {
     return { status: res?.status ?? 'DESCONOCIDO' }
   }
 
+  /**
+   * Crea (o reinicia) la sesión de WhatsApp, dejando el webhook apuntado
+   * al servidor. Después de esto la sesión queda esperando el escaneo del
+   * QR — ver qrImage().
+   *
+   * El secreto viaja como query del webhook porque es lo único que
+   * funciona igual en cualquier versión del puente; el webhook lo acepta
+   * por query o por header.
+   */
+  async startSession(webhookUrl: string): Promise<void> {
+    const { session, webhookSecret } = this.cfg
+    const url = webhookSecret
+      ? `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}secret=${encodeURIComponent(webhookSecret)}`
+      : webhookUrl
+    const body = {
+      name: session,
+      start: true,
+      config: {
+        webhooks: [{ url, events: ['message', 'message.any'] }],
+      },
+    }
+    try {
+      await this.call('/api/sessions', body)
+    } catch {
+      // Ya existía: reiniciarla alcanza (y si el número estaba deslogueado,
+      // vuelve a pedir QR).
+      await this.call(`/api/sessions/${encodeURIComponent(session)}/restart`)
+    }
+  }
+
+  /**
+   * El código QR para vincular el número, como data-url lista para un
+   * <img>. Devuelve null si la sesión no está pidiendo QR en este momento
+   * (ya vinculada, o todavía arrancando).
+   */
+  async qrImage(): Promise<string | null> {
+    const { apiUrl, apiKey, session } = this.cfg
+    const res = await fetch(
+      `${apiUrl}/api/${encodeURIComponent(session)}/auth/qr?format=image`,
+      { headers: { 'X-Api-Key': apiKey, Accept: 'image/png' } },
+    )
+    if (!res.ok) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    return `data:image/png;base64,${buf.toString('base64')}`
+  }
+
   parseWebhook(payload: unknown): InboundMessage | null {
     const env = payload as WahaEnvelope
     // 'message' son los del cliente; 'message.any' incluye los del negocio,
