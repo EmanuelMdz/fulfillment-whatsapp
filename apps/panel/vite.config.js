@@ -8,6 +8,8 @@ import react from '@vitejs/plugin-react'
  */
 export default defineConfig({
   plugins: [react()],
+  // El .env vive en la raíz del repo (uno solo para servidor y panel).
+  envDir: '../..',
   build: {
     outDir: '../bot/public',
     emptyOutDir: true,

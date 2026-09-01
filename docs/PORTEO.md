@@ -56,18 +56,19 @@ base, sin una sola línea del negocio de origen.
 
 ## Tanda 2 — Panel y conexión
 
-- [ ] `AdminLayout` + `Login` + `RequireAuth` (313 ln) — que el menú lea los módulos
-- [ ] `Conversaciones` + `ChatThread` + `Avatar` (614 ln) — tal cual
-- [ ] `Revision.jsx` (394 ln) — tal cual
-- [ ] `Studio.jsx` (490 ln) — tal cual, incluye la configuración de avisos
-- [ ] `TestChat.jsx` (228 ln) — tal cual
-- [ ] `ProductBotTab.jsx` (199 ln) — tal cual
-- [ ] `Metricas.jsx` (201 ln) — podar
-- [ ] `CustomerCard.jsx` (796 ln) — podar los campos de logística
-- [ ] `Products` + `ProductForm` + `Stock` (1.126 ln) — simplificar
-- [ ] `lib/bot.js` + `lib/botApi.js` (706 ln) — tal cual
-- [ ] `motivos.js` (25 motivos) — mover a la base como catálogo por pack
-- [ ] **Nuevo**: conectar el número por QR — crear sesión, pedir el código, dejar el webhook configurado, pantalla de estado
+- [x] Layout + Login + RequireAuth — escritos de cero contra el esquema nuevo (menú fijo por ahora; lee módulos en la tanda 3)
+- [x] Conversaciones + hilo — espejo del WhatsApp con responder-como-humano (toma el control), devolver al bot y cerrar; mobile tipo WhatsApp (lista → hilo)
+- [x] Revisión — la bandeja: motivo del pack o de guarda, abrir chat, devolver al bot, resolver
+- [x] Studio — prompts editables (identidad / atención / seguimientos), nombre, zona horaria, grupo de avisos y llave general del bot
+- [x] `lib/bot.js` + `lib/botApi.js` → `lib/supabase.js` (datos directo con RLS) + `lib/api.js` (acciones vía servidor con el access_token)
+- [x] `motivos.js` → ya viven en la base (`app_config.escalation_reasons`, por pack) desde el diseño del núcleo
+- [x] **Nuevo**: conectar el número por QR — arrancar sesión con webhook configurado solo, pantalla de estado y QR que se refresca
+- [x] Vista `v_conversations_overview` (0006, security_invoker) para la lista de chats
+- [ ] `TestChat.jsx` — probar el bot sin gastar un número
+- [ ] `CustomerCard.jsx` — ficha del contacto (collected) + crear pedido pre-llenado desde el chat
+- [ ] Catálogo en el panel (`Products` + `ProductForm` + `Stock` simplificados) + pestaña de pedidos
+- [ ] `Metricas.jsx` — podar
+- [ ] `ProductBotTab.jsx` — la ficha `bot_info` se edita con el catálogo (va junto al punto de arriba)
 - [ ] **Nuevo**: instalador que corra migraciones, siembre y cree el usuario dueño
 
 **Listo cuando** alguien que nunca vio el repo clona, corre el instalador,
