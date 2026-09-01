@@ -143,6 +143,35 @@ export async function notifyReview(params: {
 }
 
 /**
+ * Hay un pedido esperando que alguien lo confirme. Es EL aviso que mueve
+ * plata: el cliente ya dijo que sí y está esperando — cada hora que pasa
+ * sin confirmarlo enfría la venta.
+ */
+export async function notifyOrderPending(params: {
+  conversationId: string
+  chatId: string
+  /** Cómo se llama un pedido en este negocio ("Venta", "Consulta"…). */
+  orderLabel: string
+  summary: string
+  episodeKey: string
+}): Promise<boolean> {
+  const link = conversationLink(params.conversationId)
+  return sendGroupNotice({
+    kind: 'pedido_pendiente',
+    episodeKey: params.episodeKey,
+    conversationId: params.conversationId,
+    lines: [
+      `💰 ${sanitizeVar(params.orderLabel, 30)} para CONFIRMAR: ${sanitizeVar(params.chatId.split('@')[0], 40)}`,
+      // El resumen es multilínea (un renglón por item): se limpia renglón
+      // por renglón para no aplastarlo.
+      ...params.summary.split('\n').map((l) => sanitizeVar(l, 160)),
+      'Revisalo y confirmáselo al cliente desde el panel:',
+      link,
+    ],
+  })
+}
+
+/**
  * URGENTE: el turno se cayó y el cliente quedó MUDO.
  *
  * Este aviso existe porque el error silencioso es el peor de todos: el

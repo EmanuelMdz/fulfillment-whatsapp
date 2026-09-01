@@ -1,11 +1,12 @@
 import { loadEnv, hasLlm } from '../config/env.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
-import { notifyReview, notifyTurnFailed } from '../notifications/notify.js'
+import { notifyOrderPending, notifyReview, notifyTurnFailed } from '../notifications/notify.js'
 import { buildTurnContext } from '../agents/context.js'
 import { parseTurnDecision } from '../agents/decision.js'
 import { planFollowups } from '../agents/followup.js'
 import { chat, type Turn } from '../agents/llm.js'
+import { createOrderFromChat } from '../orders/from-chat.js'
 import {
   cancelPendingFollowups,
   claimDueTurns,
@@ -202,6 +203,63 @@ async function responder(conversacion: Conversation): Promise<void> {
     } catch (err) {
       console.warn('[turno] no se pudo actualizar la ficha:', describe(err))
     }
+  }
+
+  // El cliente confirmó un pedido. El bot lo ANOTA — no lo cierra: el
+  // pedido nace en la primera etapa, el cliente recibe un "quedó
+  // anotado" honesto y el equipo lo confirma desde el panel. Si además
+  // el modelo pidió derivar, el pedido manda: ya deriva por sí mismo.
+  if (decision.order) {
+    try {
+      const resultado = await createOrderFromChat(conversacion, decision.order, config)
+      // Sin promesa de tiempo a propósito: "en un ratito" con una
+      // aprobación que tarda horas es un cliente reclamando a las 18hs.
+      await enqueueSend({
+        conversationId: conversacion.id,
+        channel: conversacion.channel,
+        chatId: conversacion.chat_id,
+        body: 'Dale! Ya quedó anotado, apenas el equipo lo confirme te aviso por acá 🙌',
+      })
+      await pauseForHuman(conversacion.id)
+      await cancelPendingFollowups(conversacion.id)
+      const detalle = resultado.ok ? resultado.summary : (resultado.problem ?? '')
+      const nuevo = await queueReview(conversacion.id, 'pedido_nuevo', detalle)
+      logEvent({
+        eventType: 'review.queued',
+        conversationId: conversacion.id,
+        payload: { reason: 'pedido_nuevo', nuevo, creado: resultado.ok },
+      })
+      await notifyOrderPending({
+        conversationId: conversacion.id,
+        chatId: conversacion.chat_id,
+        orderLabel: config.labels?.order ?? 'Pedido',
+        summary: resultado.ok
+          ? resultado.summary
+          : `NO se pudo crear solo: ${resultado.problem ?? 'motivo desconocido'}`,
+        episodeKey: `pedido:${conversacion.last_inbound_id ?? conversacion.id}`,
+      })
+    } catch (err) {
+      // El pedido falló pero el cliente ya recibió respuesta: que lo
+      // levante una persona, con el error a la vista.
+      logEvent({
+        eventType: 'order.failed',
+        severity: 'error',
+        conversationId: conversacion.id,
+        payload: { error: describe(err).slice(0, 300) },
+      })
+      await escalar(
+        conversacion,
+        'pedido_nuevo',
+        'El pedido confirmado no se pudo crear — armalo a mano desde el chat',
+        describe(err).slice(0, 200),
+      )
+    }
+    logEvent({
+      eventType: 'turn.answered',
+      conversationId: conversacion.id,
+      payload: { burbujas: decision.messages.length, pedido: true },
+    })
+    return
   }
 
   // El modelo pidió derivar: la respuesta YA salió (el cliente nunca

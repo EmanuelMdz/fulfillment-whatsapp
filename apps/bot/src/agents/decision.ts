@@ -13,6 +13,8 @@ export interface TurnDecision {
   escalateReason: string | null
   /** Datos personales nuevos que dio el cliente (nombre, dirección…). */
   data: Record<string, string> | null
+  /** El pedido que el cliente confirmó, o null. Ids del catálogo. */
+  order: { items: Array<{ id: string; qty: number }>; note: string } | null
 }
 
 const MAX_BUBBLES = 3
@@ -33,10 +35,11 @@ export function parseTurnDecision(raw: string, validReasons: string[]): TurnDeci
     mensajes?: unknown
     derivar?: unknown
     datos?: unknown
+    pedido?: unknown
   } | null
 
   if (!parsed || !Array.isArray(parsed.mensajes)) {
-    return { messages: cleanMessages([raw]), escalateReason: null, data: null }
+    return { messages: cleanMessages([raw]), escalateReason: null, data: null, order: null }
   }
 
   let escalateReason: string | null = null
@@ -62,10 +65,33 @@ export function parseTurnDecision(raw: string, validReasons: string[]): TurnDeci
     if (Object.keys(limpio).length) data = limpio
   }
 
+  // El pedido se toma solo si trae items con pinta de reales. La
+  // validación contra el catálogo (¿existen esos ids?) no es de acá:
+  // vive donde se crea el pedido, que es quien conoce el catálogo.
+  let order: TurnDecision['order'] = null
+  const pedido = parsed.pedido as { items?: unknown; nota?: unknown } | null
+  if (pedido && typeof pedido === 'object' && Array.isArray(pedido.items)) {
+    const items = pedido.items
+      .map((it) => {
+        const item = it as { id?: unknown; cantidad?: unknown }
+        if (typeof item.id !== 'string' || !item.id.trim()) return null
+        const qty =
+          typeof item.cantidad === 'number' && Number.isFinite(item.cantidad)
+            ? Math.max(1, Math.round(item.cantidad))
+            : 1
+        return { id: item.id.trim(), qty }
+      })
+      .filter((it): it is { id: string; qty: number } => it !== null)
+    if (items.length) {
+      order = { items, note: typeof pedido.nota === 'string' ? pedido.nota.trim() : '' }
+    }
+  }
+
   return {
     messages: cleanMessages(parsed.mensajes.map((m) => (typeof m === 'string' ? m : ''))),
     escalateReason,
     data,
+    order,
   }
 }
 

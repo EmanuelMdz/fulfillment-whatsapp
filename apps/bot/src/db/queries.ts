@@ -201,22 +201,23 @@ export async function getPrompts(channel: string): Promise<Record<string, string
   return out
 }
 
+export interface CatalogItem {
+  id: string
+  name: string
+  price: number
+  description: string
+  bot_info: string
+}
+
 /** El catálogo activo, con la ficha que la IA puede contar. */
-export async function getCatalog(): Promise<
-  Array<{ name: string; price: number; description: string; bot_info: string }>
-> {
+export async function getCatalog(): Promise<CatalogItem[]> {
   const res = await db()
     .from('catalog_items')
-    .select('name, price, description, bot_info')
+    .select('id, name, price, description, bot_info')
     .eq('active', true)
     .order('sort')
   if (res.error) throw res.error
-  return (res.data ?? []) as Array<{
-    name: string
-    price: number
-    description: string
-    bot_info: string
-  }>
+  return (res.data ?? []) as CatalogItem[]
 }
 
 export interface AppConfig {
@@ -374,6 +375,66 @@ export async function getSentFollowupMessages(conversationId: string): Promise<s
     .order('created_at', { ascending: true })
   if (res.error) return []
   return ((res.data ?? []) as Array<{ message: string }>).map((r) => r.message)
+}
+
+// ── Pedidos que arma el bot ──────────────────────────────────
+
+export interface BotOrderItem {
+  catalog_item_id: string
+  name: string
+  qty: number
+  unit_price: number
+}
+
+/**
+ * Crea el pedido que la IA armó en el chat. Nace en la PRIMERA etapa del
+ * negocio (nunca en una final): el bot lo anota, una persona lo confirma.
+ * Los precios vienen del catálogo, jamás de lo que dijo el modelo.
+ */
+export async function createBotOrder(input: {
+  contactId: string | null
+  items: BotOrderItem[]
+  total: number
+  stage: string
+  notes: string
+}): Promise<string> {
+  const res = await db()
+    .from('orders')
+    .insert({
+      contact_id: input.contactId,
+      items: input.items,
+      total: input.total,
+      stage: input.stage,
+      source: 'bot',
+      notes: input.notes,
+    })
+    .select('id')
+    .single()
+  if (res.error) throw res.error
+  return res.data.id as string
+}
+
+/**
+ * ¿Este contacto ya tiene un pedido del bot sin terminar? Evita que un
+ * "sí, dale" repetido diez mensajes después arme el MISMO pedido dos
+ * veces. `finalStages` son las etapas terminales del negocio: lo que no
+ * está en una de esas sigue vivo.
+ */
+export async function findOpenBotOrder(
+  contactId: string,
+  finalStages: string[],
+): Promise<{ id: string; stage: string } | null> {
+  let query = db()
+    .from('orders')
+    .select('id, stage')
+    .eq('contact_id', contactId)
+    .eq('source', 'bot')
+  if (finalStages.length) {
+    query = query.not('stage', 'in', `(${finalStages.map((s) => `"${s}"`).join(',')})`)
+  }
+  const res = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (res.error) throw res.error
+  return (res.data as { id: string; stage: string }) ?? null
 }
 
 // ── Ficha del contacto ───────────────────────────────────────

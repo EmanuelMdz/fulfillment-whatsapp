@@ -29,8 +29,11 @@ El esqueleto que hace que el bot conteste, escrito de cero (no portado):
 - [x] Turno: espera, verifica que siga siendo el último mensaje, arma el contexto y contesta
 - [x] Acceso al modelo con Gemini y OpenAI detrás de la misma función
 
-**Cómo probarlo**: aplicá las dos migraciones, cargá las claves, apuntá el
-webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
+**Cómo probarlo**: aplicá las migraciones (0001-0005) en orden, cargá las
+claves, apuntá el webhook del puente a `/webhook/whatsapp` y mandate un
+mensaje. Para ver derivaciones y pedidos hace falta la config del pack en
+`app_config` (motivos y etapas) — hasta que exista el instalador, se
+copia a mano desde `packages/core/src/index.js`.
 
 ### Lo que falta portar
 
@@ -42,11 +45,11 @@ webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
 - [x] Observabilidad → tabla `event_log` + `logEvent()` con catálogo cerrado (0003)
 - [x] `notifications/` → avisos al grupo con idempotencia por episodio, por la cola de envío; incluye el aviso "el bot no pudo contestar" (turno caído)
 - [x] `message-processor.ts` → destilado al turno del producto (0004): decisión en JSON (mensajes + derivar + datos de ficha), guardas anti-loop / anti-repetición / respuesta vacía con línea puente, cola de revisión con motivos del pack, llave general del bot, reapertura de conversaciones cerradas. Los pasos de envío/cobro/visión/audio quedan para los módulos.
-- [ ] `knowledge-base.ts` + `kb-render.ts` (587 ln) — generalizar a producto o prestación
-- [ ] `create-order.ts` (453 ln) — sacarle los envíos, dejarlo genérico
+- [x] `knowledge-base.ts` + `kb-render.ts` → el catálogo con `bot_info` renderizado en `agents/context.ts` (producto o prestación por diseño de `catalog_items.kind`). Los bloques de envíos/pagos del origen quedan para los módulos `shipping`/`payments`.
+- [x] `create-order.ts` → `orders/from-chat.ts`: el pedido nace en la primera etapa del negocio con precios del CATÁLOGO (nunca del modelo), gate humano (el bot anota, una persona confirma), guarda anti-duplicado por contacto y aviso "para CONFIRMAR" al grupo. Sin envíos.
 - [x] `lead-state.ts` + `echo-handler.ts` — toma (esqueleto) + devolución con el invariante de `handback_at` (`handbackToBot`; la ruta del panel llega en la tanda 2)
 - [x] Seguimientos automáticos (0005): la IA los planea después de cada respuesta (horas relativas, nunca fechas — el modelo alucina fechas), ventana nocturna 23-09 local, cancelación al escribir el cliente / al entrar una persona, descarte de vencidos (>24h de atraso), regla anti-repetición de ángulo
-- [ ] `queries.ts` (1.336 ln) — podar lo que no aplica
+- [x] `queries.ts` — no se podó: se reescribió de cero al ritmo de las piezas (el `queries.ts` nuevo tiene solo lo que el producto usa)
 
 **Listo cuando** el bot contesta un WhatsApp real con prompts cargados desde la
 base, sin una sola línea del negocio de origen.
