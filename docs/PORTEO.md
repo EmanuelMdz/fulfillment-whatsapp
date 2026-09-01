@@ -66,9 +66,8 @@ base, sin una sola línea del negocio de origen.
 - [x] Vista `v_conversations_overview` (0006, security_invoker) para la lista de chats
 - [ ] `TestChat.jsx` — probar el bot sin gastar un número
 - [ ] `CustomerCard.jsx` — ficha del contacto (collected) + crear pedido pre-llenado desde el chat
-- [ ] Catálogo en el panel (`Products` + `ProductForm` + `Stock` simplificados) + pestaña de pedidos
+- [x] Catálogo en el panel (con `bot_info` como campo estrella — absorbe a `ProductBotTab`) + pestaña de pedidos con etapas del pack y "Abrir chat" (cierra el circuito del pedido del bot)
 - [ ] `Metricas.jsx` — podar
-- [ ] `ProductBotTab.jsx` — la ficha `bot_info` se edita con el catálogo (va junto al punto de arriba)
 - [x] **Nuevo**: instalador completo — corre las migraciones que falten (tabla `_migrations`, una transacción por archivo), escribe la config del pack desde `packages/core`, prende los módulos, siembra el catálogo de ejemplo y crea el usuario dueño. Re-ejecutable sin miedo.
 
 **Listo cuando** alguien que nunca vio el repo clona, corre el instalador,

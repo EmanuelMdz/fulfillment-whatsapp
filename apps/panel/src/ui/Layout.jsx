@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { MessageSquare, Inbox, SlidersHorizontal, QrCode, LogOut } from 'lucide-react'
+import { MessageSquare, Inbox, ClipboardList, Package, SlidersHorizontal, QrCode, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 /**
@@ -10,14 +10,18 @@ import { supabase } from '../lib/supabase.js'
  */
 export default function Layout() {
   const [nombreNegocio, setNombreNegocio] = useState('')
+  const [labels, setLabels] = useState({})
 
   useEffect(() => {
     supabase
       .from('app_config')
-      .select('business_name')
+      .select('business_name, labels')
       .eq('id', 1)
       .maybeSingle()
-      .then(({ data }) => setNombreNegocio(data?.business_name || 'Panel'))
+      .then(({ data }) => {
+        setNombreNegocio(data?.business_name || 'Panel')
+        setLabels(data?.labels ?? {})
+      })
   }, [])
 
   return (
@@ -31,6 +35,14 @@ export default function Layout() {
         <NavLink to="/revision">
           <Inbox size={17} />
           <span>Revisión</span>
+        </NavLink>
+        <NavLink to="/pedidos">
+          <ClipboardList size={17} />
+          <span>{labels.order_plural ?? 'Pedidos'}</span>
+        </NavLink>
+        <NavLink to="/catalogo">
+          <Package size={17} />
+          <span>{labels.item_plural ?? 'Catálogo'}</span>
         </NavLink>
         <NavLink to="/studio">
           <SlidersHorizontal size={17} />
