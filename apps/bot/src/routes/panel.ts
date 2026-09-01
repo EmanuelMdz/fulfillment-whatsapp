@@ -1,8 +1,11 @@
 import { Hono } from 'hono'
-import { loadEnv, hasWhatsapp } from '../config/env.js'
+import { loadEnv, hasWhatsapp, hasLlm } from '../config/env.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
+import { buildTurnContext } from '../agents/context.js'
+import { parseTurnDecision } from '../agents/decision.js'
+import { chat, type Turn } from '../agents/llm.js'
 import {
   cancelPendingFollowups,
   closeConversation,
@@ -117,6 +120,47 @@ panelRoute.post('/close', async (c) => {
   await resolveOpenReview(conversationId)
   await cancelPendingFollowups(conversationId)
   return c.json({ ok: true, estado: 'cerrado' })
+})
+
+// ── Probar el bot sin gastar un número ───────────────────────
+// El mismo contexto y el mismo contrato del turno real, pero sin tocar
+// la base ni WhatsApp: el navegador manda el historial y recibe la
+// DECISIÓN completa — incluidos derivación, datos y pedido — para que
+// se vea qué habría hecho el bot de verdad.
+panelRoute.post('/test-chat', async (c) => {
+  const env = loadEnv()
+  if (!hasLlm(env)) {
+    return c.json({ error: 'Falta la clave del modelo (GEMINI_API_KEY u OPENAI_API_KEY)' }, 400)
+  }
+  let body: { messages?: unknown }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'JSON inválido' }, 400)
+  }
+  if (!Array.isArray(body.messages) || !body.messages.length) {
+    return c.json({ error: 'Falta messages: [{role, content}]' }, 400)
+  }
+
+  const turnos: Turn[] = (body.messages as Array<{ role?: unknown; content?: unknown }>)
+    .filter((m) => typeof m.content === 'string' && (m.content as string).trim())
+    .slice(-30)
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: (m.content as string).trim(),
+    }))
+
+  try {
+    const { system, config } = await buildTurnContext('whatsapp')
+    const crudo = await chat(system, turnos)
+    const decision = parseTurnDecision(
+      crudo,
+      (config.escalation_reasons ?? []).map((r) => r.key),
+    )
+    return c.json({ ok: true, decision, crudo })
+  } catch (err) {
+    return c.json({ error: describe(err) }, 502)
+  }
 })
 
 // ── Conexión de WhatsApp (sesión + QR) ───────────────────────

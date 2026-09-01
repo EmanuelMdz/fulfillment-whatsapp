@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { MessageSquare, Inbox, ClipboardList, Package, SlidersHorizontal, QrCode, LogOut } from 'lucide-react'
+import { MessageSquare, Inbox, ClipboardList, Package, SlidersHorizontal, QrCode, FlaskConical, ChartNoAxesColumn, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 /**
@@ -44,9 +44,17 @@ export default function Layout() {
           <Package size={17} />
           <span>{labels.item_plural ?? 'Catálogo'}</span>
         </NavLink>
+        <NavLink to="/metricas">
+          <ChartNoAxesColumn size={17} />
+          <span>Métricas</span>
+        </NavLink>
         <NavLink to="/studio">
           <SlidersHorizontal size={17} />
           <span>Studio</span>
+        </NavLink>
+        <NavLink to="/test">
+          <FlaskConical size={17} />
+          <span>Probar el bot</span>
         </NavLink>
         <NavLink to="/conexion">
           <QrCode size={17} />

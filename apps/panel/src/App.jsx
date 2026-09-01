@@ -6,6 +6,8 @@ import Revision from './pages/Revision.jsx'
 import Pedidos from './pages/Pedidos.jsx'
 import Catalogo from './pages/Catalogo.jsx'
 import Studio from './pages/Studio.jsx'
+import TestChat from './pages/TestChat.jsx'
+import Metricas from './pages/Metricas.jsx'
 import Conexion from './pages/Conexion.jsx'
 
 /**
@@ -23,6 +25,8 @@ export default function App() {
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/catalogo" element={<Catalogo />} />
             <Route path="/studio" element={<Studio />} />
+            <Route path="/test" element={<TestChat />} />
+            <Route path="/metricas" element={<Metricas />} />
             <Route path="/conexion" element={<Conexion />} />
             <Route path="*" element={<Conversaciones />} />
           </Route>
