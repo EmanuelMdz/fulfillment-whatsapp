@@ -1,15 +1,20 @@
 import { loadEnv, hasLlm } from '../config/env.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
-import { notifyTurnFailed } from '../notifications/notify.js'
-import { buildSystemPrompt } from '../agents/context.js'
+import { notifyReview, notifyTurnFailed } from '../notifications/notify.js'
+import { buildTurnContext } from '../agents/context.js'
+import { parseTurnDecision } from '../agents/decision.js'
 import { chat, type Turn } from '../agents/llm.js'
 import {
   claimDueTurns,
   enqueueSend,
+  getConfig,
   history,
   lastInboundId,
   lastInboundPreview,
+  mergeCollectedData,
+  pauseForHuman,
+  queueReview,
   type Conversation,
 } from '../db/queries.js'
 
@@ -27,9 +32,44 @@ import {
  * quedaban sin respuesta y nadie se enteraba. Así, siguen agendadas y se
  * contestan igual.
  * ────────────────────────────────────────────────────────────
+ *
+ * El turno no es solo "preguntarle al modelo": es una fila de guardas
+ * alrededor del modelo. Cada una existe por un incidente real — el bot
+ * repitiéndose en loop, contestando dos veces lo mismo, devolviendo
+ * vacío. El modelo propone; el código decide qué sale de verdad.
  */
 
 let corriendo = false
+let avisoApagado = false
+
+const LINEA_PUENTE = 'Dame un momentito que lo reviso y te escribo 🙌'
+
+/**
+ * La conversación pasa a manos del equipo: el bot se calla, queda un caso
+ * en la cola de revisión y el grupo recibe un aviso (una vez por
+ * episodio). "Devolver al bot" desde el panel la destraba.
+ */
+async function escalar(
+  conversacion: Conversation,
+  reason: string,
+  reasonLabel: string,
+  detail: string,
+): Promise<void> {
+  await pauseForHuman(conversacion.id)
+  const nuevo = await queueReview(conversacion.id, reason, detail)
+  logEvent({
+    eventType: 'review.queued',
+    conversationId: conversacion.id,
+    payload: { reason, nuevo },
+  })
+  await notifyReview({
+    conversationId: conversacion.id,
+    chatId: conversacion.chat_id,
+    reasonLabel,
+    lastMessage: detail || undefined,
+    episodeKey: `revision:${conversacion.last_inbound_id ?? conversacion.id}`,
+  })
+}
 
 async function responder(conversacion: Conversation): Promise<void> {
   // ¿Sigue siendo el último mensaje el que disparó este turno?
@@ -49,31 +89,136 @@ async function responder(conversacion: Conversation): Promise<void> {
   const historial = await history(conversacion.id, 20)
   if (!historial.length) return
 
-  const system = await buildSystemPrompt(conversacion.channel)
+  // ¿Hay algo nuevo que contestar? Si el último mensaje del hilo no es
+  // del cliente, este mensaje ya fue respondido (o lo respondió una
+  // persona). Correr el modelo acá es gastar plata para repetirse.
+  const ultimoDelHilo = historial[historial.length - 1]
+  if (ultimoDelHilo.author !== 'customer') {
+    logEvent({
+      eventType: 'turn.skipped',
+      conversationId: conversacion.id,
+      payload: { motivo: 'ya_respondido' },
+    })
+    return
+  }
+
+  const cuerposBot = historial
+    .filter((m) => m.author === 'bot')
+    .map((m) => m.body.trim().toLowerCase())
+
+  // Guarda anti-loop: el bot mandó EL MISMO mensaje 3 veces seguidas.
+  // Está atascado — mandarlo una cuarta vez no lo va a desatascar. Pasa a
+  // una persona, sin mensaje extra: a esta altura el bot ya habló de sobra.
+  const ultimasTres = cuerposBot.slice(-3)
+  if (ultimasTres.length === 3 && new Set(ultimasTres).size === 1) {
+    logEvent({
+      eventType: 'guardrail.loop',
+      severity: 'warn',
+      conversationId: conversacion.id,
+    })
+    await escalar(
+      conversacion,
+      'loop_detectado',
+      'El bot quedó en loop (mandó lo mismo 3 veces)',
+      (await lastInboundPreview(conversacion.id)) ?? '',
+    )
+    return
+  }
+
+  const { system, config } = await buildTurnContext(conversacion.channel)
   const turnos: Turn[] = historial.map((m) => ({
     role: m.author === 'customer' ? 'user' : 'assistant',
     content: m.body,
   }))
 
-  const respuesta = await chat(system, turnos)
+  const crudo = await chat(system, turnos)
+  const decision = parseTurnDecision(
+    crudo,
+    (config.escalation_reasons ?? []).map((r) => r.key),
+  )
 
-  // Un modelo puede devolver vacío. Antes que mandar un mensaje en blanco,
-  // no mandamos nada: el silencio se nota menos que un globo vacío.
-  if (!respuesta.trim()) {
+  // El modelo no devolvió nada usable. Antes que el silencio, una línea
+  // puente — y el chat a revisión para que lo levante una persona.
+  if (!decision.messages.length) {
     console.warn(`[turno] el modelo no devolvió nada para ${conversacion.chat_id}`)
+    await enqueueSend({
+      conversationId: conversacion.id,
+      channel: conversacion.channel,
+      chatId: conversacion.chat_id,
+      body: LINEA_PUENTE,
+    })
+    await escalar(
+      conversacion,
+      'respuesta_vacia',
+      'El modelo devolvió una respuesta vacía',
+      (await lastInboundPreview(conversacion.id)) ?? '',
+    )
     return
   }
 
-  await enqueueSend({
-    conversationId: conversacion.id,
-    channel: conversacion.channel,
-    chatId: conversacion.chat_id,
-    body: respuesta,
-  })
+  // Guarda anti-repetición: si TODO lo que quiere mandar ya lo dijo en
+  // sus últimos mensajes, no se manda — el cliente lo leyó y no le
+  // alcanzó. Repetírselo es la mejor forma de perderlo.
+  const recientes = cuerposBot.slice(-6)
+  const nuevos = decision.messages.map((m) => m.trim().toLowerCase())
+  if (recientes.length && nuevos.every((n) => recientes.includes(n))) {
+    logEvent({
+      eventType: 'guardrail.repeat',
+      severity: 'warn',
+      conversationId: conversacion.id,
+    })
+    await escalar(
+      conversacion,
+      'repeticion',
+      'El bot iba a repetir su última respuesta',
+      (await lastInboundPreview(conversacion.id)) ?? '',
+    )
+    return
+  }
+
+  // Las burbujas van a la cola en orden; el trabajador de envío les pone
+  // el ritmo (una por vez, con pausas). Ver workers/send-queue.ts.
+  for (const mensaje of decision.messages) {
+    await enqueueSend({
+      conversationId: conversacion.id,
+      channel: conversacion.channel,
+      chatId: conversacion.chat_id,
+      body: mensaje,
+    })
+  }
+
+  // La ficha se llena apenas hay datos, pase lo que pase después: si esto
+  // corriera al final, cualquier salida temprana tiraría lo recolectado
+  // (y la corrección de una dirección es EXACTAMENTE el dato que no se
+  // puede perder).
+  if (decision.data && conversacion.contact_id) {
+    try {
+      await mergeCollectedData(conversacion.contact_id, decision.data)
+    } catch (err) {
+      console.warn('[turno] no se pudo actualizar la ficha:', describe(err))
+    }
+  }
+
+  // El modelo pidió derivar: la respuesta YA salió (el cliente nunca
+  // queda mudo) y recién ahora la conversación pasa al equipo.
+  if (decision.escalateReason) {
+    const motivo = (config.escalation_reasons ?? []).find((r) => r.key === decision.escalateReason)
+    await escalar(
+      conversacion,
+      decision.escalateReason,
+      motivo?.label ?? decision.escalateReason,
+      (await lastInboundPreview(conversacion.id)) ?? '',
+    )
+  }
+
   logEvent({
     eventType: 'turn.answered',
     conversationId: conversacion.id,
-    payload: { chars: respuesta.length },
+    payload: {
+      burbujas: decision.messages.length,
+      derivado: decision.escalateReason,
+      con_datos: Boolean(decision.data),
+    },
   })
 }
 
@@ -82,6 +227,22 @@ async function tick(): Promise<void> {
   corriendo = true
 
   try {
+    // Llave general: con el bot apagado desde el panel no se reclama
+    // NINGÚN turno. Los turnos quedan agendados en la base — al volver a
+    // prenderlo, se contestan (tarde es mejor que nunca, y que mudo).
+    const config = await getConfig()
+    if (!config.bot_enabled) {
+      if (!avisoApagado) {
+        console.log('[turno] bot APAGADO desde el panel — los turnos esperan')
+        avisoApagado = true
+      }
+      return
+    }
+    if (avisoApagado) {
+      console.log('[turno] bot prendido de nuevo — retomando turnos')
+      avisoApagado = false
+    }
+
     const vencidas = await claimDueTurns(5)
     for (const conversacion of vencidas) {
       try {

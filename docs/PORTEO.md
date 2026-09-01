@@ -41,10 +41,10 @@ webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
 - [x] Utilidades: reintentos con espera creciente y fecha con día de semana para el prompt
 - [x] Observabilidad → tabla `event_log` + `logEvent()` con catálogo cerrado (0003)
 - [x] `notifications/` → avisos al grupo con idempotencia por episodio, por la cola de envío; incluye el aviso "el bot no pudo contestar" (turno caído)
-- [ ] `message-processor.ts` (2.024 ln) — portar entero y sacarle los pasos de envío y cobro a puntos de extensión
+- [x] `message-processor.ts` → destilado al turno del producto (0004): decisión en JSON (mensajes + derivar + datos de ficha), guardas anti-loop / anti-repetición / respuesta vacía con línea puente, cola de revisión con motivos del pack, llave general del bot, reapertura de conversaciones cerradas. Los pasos de envío/cobro/visión/audio quedan para los módulos.
 - [ ] `knowledge-base.ts` + `kb-render.ts` (587 ln) — generalizar a producto o prestación
 - [ ] `create-order.ts` (453 ln) — sacarle los envíos, dejarlo genérico
-- [ ] `lead-state.ts` + `echo-handler.ts` — toma y devolución del control humano (la toma ya está en el esqueleto; falta la devolución con su invariante)
+- [x] `lead-state.ts` + `echo-handler.ts` — toma (esqueleto) + devolución con el invariante de `handback_at` (`handbackToBot`; la ruta del panel llega en la tanda 2)
 - [ ] Seguimientos automáticos (followup-agent + schedule + crons)
 - [ ] `queries.ts` (1.336 ln) — podar lo que no aplica
 

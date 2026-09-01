@@ -228,6 +228,8 @@ export interface AppConfig {
   escalation_reasons: Array<{ key: string; label: string }>
   business_hours: Record<string, unknown>
   notify_chat_id: string | null
+  /** Llave general: en false, el bot no contesta nada (los mensajes se guardan igual). */
+  bot_enabled: boolean
 }
 
 /** La fila única de configuración. Si falta (instalación a medias), valores vacíos. */
@@ -244,8 +246,94 @@ export async function getConfig(): Promise<AppConfig> {
       escalation_reasons: [],
       business_hours: {},
       notify_chat_id: null,
+      bot_enabled: true,
     }
   )
+}
+
+// ── Control de la conversación ───────────────────────────────
+
+/**
+ * Una conversación cerrada a la que el cliente vuelve a escribir se
+ * reabre sola: "cerrado" significa "terminó", no "no atender". Descartar
+ * a alguien es una decisión humana, y se toma desde el panel.
+ */
+export async function reopenConversation(conversationId: string): Promise<void> {
+  const res = await db()
+    .from('conversations')
+    .update({ state: 'bot' })
+    .eq('id', conversationId)
+  if (res.error) throw res.error
+}
+
+/**
+ * Devolver la conversación al bot.
+ *
+ * `handback_at` es el corte: la evidencia humana ANTERIOR a esta marca ya
+ * no cuenta para volver a pausar el bot. Sin esto, la conversación rebota
+ * entre humano y bot para siempre — el eco viejo de la persona la vuelve
+ * a pausar apenas se la devolvés.
+ */
+export async function handbackToBot(conversationId: string): Promise<void> {
+  const res = await db()
+    .from('conversations')
+    .update({ state: 'bot', handback_at: new Date().toISOString() })
+    .eq('id', conversationId)
+  if (res.error) throw res.error
+}
+
+// ── Cola de revisión ─────────────────────────────────────────
+
+/**
+ * Deja la conversación en la bandeja del equipo. Si ya tenía un caso
+ * abierto, el índice único lo rebota y no pasa nada: tres guardas
+ * escalando el mismo chat siguen siendo UNA fila en la cola.
+ * Devuelve true si el caso es nuevo.
+ */
+export async function queueReview(
+  conversationId: string,
+  reason: string,
+  detail: string,
+): Promise<boolean> {
+  const res = await db()
+    .from('review_queue')
+    .insert({ conversation_id: conversationId, reason, detail })
+  if (!res.error) return true
+  if (res.error.code === '23505') return false
+  throw res.error
+}
+
+// ── Ficha del contacto ───────────────────────────────────────
+
+/**
+ * Mergea los datos que la IA fue juntando en la conversación (nombre,
+ * dirección, lo que sea) dentro de `contacts.collected`. Es la ficha que
+ * pre-llena el formulario cuando se crea un pedido desde el chat.
+ *
+ * Lo nuevo pisa lo viejo clave por clave — el cliente que corrige su
+ * dirección tres veces se queda con la última, no con la primera.
+ * Y si el contacto todavía no tiene nombre, lo bautiza con el real.
+ */
+export async function mergeCollectedData(
+  contactId: string,
+  data: Record<string, string>,
+): Promise<void> {
+  const actual = await db()
+    .from('contacts')
+    .select('name, collected')
+    .eq('id', contactId)
+    .maybeSingle()
+  if (actual.error) throw actual.error
+  if (!actual.data) return
+
+  const merged = { ...((actual.data.collected as Record<string, string>) ?? {}), ...data }
+  const cambios: Record<string, unknown> = { collected: merged }
+  if (data.nombre_completo && !(actual.data.name as string)?.trim()) {
+    cambios.name = data.nombre_completo
+  }
+
+  const res = await db().from('contacts').update(cambios).eq('id', contactId)
+  if (res.error) throw res.error
 }
 
 // ── Avisos al grupo ──────────────────────────────────────────

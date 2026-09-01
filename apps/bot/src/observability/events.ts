@@ -27,11 +27,17 @@ export const EVENT_TYPES = [
   // El ciclo del turno.
   'turn.answered',        // el bot contestó
   'turn.superseded',      // llegó otro mensaje mientras esperaba: turno descartado
+  'turn.skipped',         // el turno no corrió (payload.motivo dice por qué)
   'turn.failed',          // el turno murió con error — el cliente quedó sin respuesta
 
   // Quién tiene el control de la conversación.
   'conversation.human_takeover', // alguien del negocio contestó a mano: el bot se calla
   'conversation.handback',       // devolvieron la conversación al bot
+  'conversation.reopened',       // estaba cerrada y el cliente volvió a escribir
+
+  // Guardas: el código frenó algo que el modelo quería hacer.
+  'guardrail.loop',       // el bot mandó lo mismo 3 veces seguidas
+  'guardrail.repeat',     // la respuesta nueva repetía lo recién dicho
 
   // La cola de envío.
   'send.failed',          // un mensaje agotó sus intentos y no salió

@@ -116,6 +116,33 @@ export async function sendGroupNotice(input: NoticeInput): Promise<boolean> {
 }
 
 /**
+ * La conversación cayó en la cola de revisión: alguien del equipo tiene
+ * que mirarla. `reasonLabel` es el motivo en palabras del negocio (viene
+ * de app_config.escalation_reasons o de una guarda del código).
+ */
+export async function notifyReview(params: {
+  conversationId: string
+  chatId: string
+  reasonLabel: string
+  lastMessage?: string
+  /** Derivada del mensaje que disparó la escalada: re-ejecutar no re-avisa. */
+  episodeKey: string
+}): Promise<boolean> {
+  const link = conversationLink(params.conversationId)
+  return sendGroupNotice({
+    kind: 'revision',
+    episodeKey: params.episodeKey,
+    conversationId: params.conversationId,
+    lines: [
+      `🖐️ Necesita una persona: ${sanitizeVar(params.chatId.split('@')[0], 40)}`,
+      `Motivo: ${sanitizeVar(params.reasonLabel, 160)}`,
+      params.lastMessage ? `Último mensaje: ${sanitizeVar(params.lastMessage, 100)}` : '',
+      link,
+    ],
+  })
+}
+
+/**
  * URGENTE: el turno se cayó y el cliente quedó MUDO.
  *
  * Este aviso existe porque el error silencioso es el peor de todos: el
