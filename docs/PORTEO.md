@@ -64,10 +64,10 @@ base, sin una sola línea del negocio de origen.
 - [x] `motivos.js` → ya viven en la base (`app_config.escalation_reasons`, por pack) desde el diseño del núcleo
 - [x] **Nuevo**: conectar el número por QR — arrancar sesión con webhook configurado solo, pantalla de estado y QR que se refresca
 - [x] Vista `v_conversations_overview` (0006, security_invoker) para la lista de chats
-- [ ] `TestChat.jsx` — probar el bot sin gastar un número
-- [ ] `CustomerCard.jsx` — ficha del contacto (collected) + crear pedido pre-llenado desde el chat
+- [x] `TestChat.jsx` → "Probar el bot": mismo contexto y contrato que el turno real, sin tocar la base; muestra la decisión completa (derivación, ficha, pedido) debajo de cada respuesta
+- [x] `CustomerCard.jsx` → Ficha dentro del chat: datos juntados por la IA + pedidos del contacto (crear pedido a mano pre-llenado queda para más adelante)
 - [x] Catálogo en el panel (con `bot_info` como campo estrella — absorbe a `ProductBotTab`) + pestaña de pedidos con etapas del pack y "Abrir chat" (cierra el circuito del pedido del bot)
-- [ ] `Metricas.jsx` — podar
+- [x] `Metricas.jsx` → 7 números de los últimos 7 días, con "turnos caídos" en rojo si no está en cero
 - [x] **Nuevo**: instalador completo — corre las migraciones que falten (tabla `_migrations`, una transacción por archivo), escribe la config del pack desde `packages/core`, prende los módulos, siembra el catálogo de ejemplo y crea el usuario dueño. Re-ejecutable sin miedo.
 
 **Listo cuando** alguien que nunca vio el repo clona, corre el instalador,
