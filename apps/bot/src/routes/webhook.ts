@@ -4,6 +4,7 @@ import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
 import {
+  cancelPendingFollowups,
   findMessageByExternalId,
   findOrCreateConversation,
   pauseForHuman,
@@ -71,6 +72,9 @@ webhookRoute.post('/', async (c) => {
         providerTs: mensaje.timestamp,
       })
       await pauseForHuman(conversacion.id)
+      // Con una persona atendiendo, un recordatorio del bot en el medio
+      // del chat la pisa. Fuera.
+      await cancelPendingFollowups(conversacion.id)
       console.log(`[webhook] humano tomó la conversación ${conversacion.chat_id}`)
       logEvent({ eventType: 'conversation.human_takeover', conversationId: conversacion.id })
       return c.json({ ok: true, eco: 'humano' })
@@ -91,6 +95,10 @@ webhookRoute.post('/', async (c) => {
     // saveMessage devuelve null cuando el mensaje ya estaba: el puente lo
     // reenvió. Sin esto, cada reintento correría el turno de nuevo.
     if (!mensajeId) return c.json({ ok: true, ignorado: 'mensaje repetido' })
+
+    // El cliente escribió: cualquier recordatorio pendiente quedó viejo.
+    // El turno que viene genera los que correspondan de nuevo.
+    await cancelPendingFollowups(conversacion.id)
 
     // Una conversación cerrada a la que el cliente vuelve a escribir se
     // reabre sola: "cerrado" es "terminó", no "no atender". Descartar a

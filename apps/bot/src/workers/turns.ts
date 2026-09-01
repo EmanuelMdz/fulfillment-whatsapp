@@ -4,8 +4,10 @@ import { logEvent } from '../observability/events.js'
 import { notifyReview, notifyTurnFailed } from '../notifications/notify.js'
 import { buildTurnContext } from '../agents/context.js'
 import { parseTurnDecision } from '../agents/decision.js'
+import { planFollowups } from '../agents/followup.js'
 import { chat, type Turn } from '../agents/llm.js'
 import {
+  cancelPendingFollowups,
   claimDueTurns,
   enqueueSend,
   getConfig,
@@ -56,6 +58,9 @@ async function escalar(
   detail: string,
 ): Promise<void> {
   await pauseForHuman(conversacion.id)
+  // El chat quedó en manos del equipo: un recordatorio del bot en el
+  // medio pisaría a la persona que lo atiende.
+  await cancelPendingFollowups(conversacion.id)
   const nuevo = await queueReview(conversacion.id, reason, detail)
   logEvent({
     eventType: 'review.queued',
@@ -220,6 +225,17 @@ async function responder(conversacion: Conversation): Promise<void> {
       con_datos: Boolean(decision.data),
     },
   })
+
+  // Con la respuesta ya en la cola, se deciden los recordatorios. Corre
+  // al final a propósito: es una segunda llamada al modelo y no puede
+  // demorar la respuesta — y si falla, el turno ya está completo.
+  if (!decision.escalateReason) {
+    try {
+      await planFollowups(conversacion, historial, config)
+    } catch (err) {
+      console.warn('[turno] no se pudieron planear seguimientos:', describe(err))
+    }
+  }
 }
 
 async function tick(): Promise<void> {

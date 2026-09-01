@@ -303,6 +303,79 @@ export async function queueReview(
   throw res.error
 }
 
+/** El estado actual de una conversación, o null si no existe. */
+export async function getConversationById(conversationId: string): Promise<Conversation | null> {
+  const res = await db()
+    .from('conversations')
+    .select('*')
+    .eq('id', conversationId)
+    .maybeSingle()
+  if (res.error) throw res.error
+  return (res.data as Conversation) ?? null
+}
+
+// ── Seguimientos ─────────────────────────────────────────────
+
+export interface Followup {
+  id: string
+  conversation_id: string
+  message: string
+  scheduled_at: string
+  status: 'pending' | 'sent' | 'cancelled' | 'failed'
+}
+
+export async function scheduleFollowup(
+  conversationId: string,
+  message: string,
+  scheduledAtIso: string,
+): Promise<void> {
+  const res = await db()
+    .from('followups')
+    .insert({ conversation_id: conversationId, message, scheduled_at: scheduledAtIso })
+  if (res.error) throw res.error
+}
+
+/**
+ * Cancela los recordatorios pendientes. Se llama cada vez que el cliente
+ * escribe (la conversación revivió sola) y cada vez que el chat pasa a
+ * una persona (un recordatorio del bot en el medio de una atención humana
+ * pisa a la persona).
+ */
+export async function cancelPendingFollowups(conversationId: string): Promise<void> {
+  const res = await db()
+    .from('followups')
+    .update({ status: 'cancelled' })
+    .eq('conversation_id', conversationId)
+    .eq('status', 'pending')
+  if (res.error) throw res.error
+}
+
+/** Los recordatorios vencidos, ya reclamados (ver claim_due_followups en 0005). */
+export async function claimDueFollowups(max = 5): Promise<Followup[]> {
+  const res = await db().rpc('claim_due_followups', { max_batch: max })
+  if (res.error) throw res.error
+  return (res.data ?? []) as Followup[]
+}
+
+export async function markFollowupStatus(
+  id: string,
+  status: 'cancelled' | 'failed',
+): Promise<void> {
+  await db().from('followups').update({ status }).eq('id', id)
+}
+
+/** Lo ya enviado, para que el próximo recordatorio no repita el ángulo. */
+export async function getSentFollowupMessages(conversationId: string): Promise<string[]> {
+  const res = await db()
+    .from('followups')
+    .select('message')
+    .eq('conversation_id', conversationId)
+    .eq('status', 'sent')
+    .order('created_at', { ascending: true })
+  if (res.error) return []
+  return ((res.data ?? []) as Array<{ message: string }>).map((r) => r.message)
+}
+
 // ── Ficha del contacto ───────────────────────────────────────
 
 /**

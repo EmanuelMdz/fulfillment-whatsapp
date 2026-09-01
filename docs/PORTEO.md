@@ -45,7 +45,7 @@ webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
 - [ ] `knowledge-base.ts` + `kb-render.ts` (587 ln) — generalizar a producto o prestación
 - [ ] `create-order.ts` (453 ln) — sacarle los envíos, dejarlo genérico
 - [x] `lead-state.ts` + `echo-handler.ts` — toma (esqueleto) + devolución con el invariante de `handback_at` (`handbackToBot`; la ruta del panel llega en la tanda 2)
-- [ ] Seguimientos automáticos (followup-agent + schedule + crons)
+- [x] Seguimientos automáticos (0005): la IA los planea después de cada respuesta (horas relativas, nunca fechas — el modelo alucina fechas), ventana nocturna 23-09 local, cancelación al escribir el cliente / al entrar una persona, descarte de vencidos (>24h de atraso), regla anti-repetición de ángulo
 - [ ] `queries.ts` (1.336 ln) — podar lo que no aplica
 
 **Listo cuando** el bot contesta un WhatsApp real con prompts cargados desde la

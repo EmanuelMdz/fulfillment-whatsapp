@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { loadEnv, hasWhatsapp } from './config/env.js'
 import { healthRoute } from './routes/health.js'
 import { webhookRoute } from './routes/webhook.js'
+import { startFollowups } from './workers/followups.js'
 import { startSendQueue } from './workers/send-queue.js'
 import { startTurns } from './workers/turns.js'
 
@@ -53,6 +54,7 @@ if (hasPanel) {
 // ── Trabajadores ──────────────────────────────────────────────
 startSendQueue()
 startTurns()
+startFollowups()
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[fw] escuchando en http://localhost:${info.port}`)

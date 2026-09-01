@@ -47,6 +47,8 @@ export interface Env {
     sendTickMs: number
     /** Cada cuánto busca turnos vencidos. */
     turnTickMs: number
+    /** Cada cuánto busca seguimientos vencidos. */
+    followupTickMs: number
     /** Pausa entre un envío y el siguiente, para no comerse un bloqueo. */
     sendPauseMinMs: number
     sendPauseMaxMs: number
@@ -87,6 +89,7 @@ export function loadEnv(): Env {
       debounceSeconds: num('DEBOUNCE_SECONDS', 90),
       sendTickMs: num('SEND_TICK_MS', 8000),
       turnTickMs: num('TURN_TICK_MS', 10000),
+      followupTickMs: num('FOLLOWUP_TICK_MS', 60000),
       sendPauseMinMs: num('SEND_PAUSE_MIN_MS', 2000),
       sendPauseMaxMs: num('SEND_PAUSE_MAX_MS', 6000),
     },
