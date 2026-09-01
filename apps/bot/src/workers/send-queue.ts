@@ -1,5 +1,6 @@
 import { loadEnv } from '../config/env.js'
 import { describe } from '../utils/errors.js'
+import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
 import { claimNextSend, markFailed, markSent, saveMessage } from '../db/queries.js'
 
@@ -75,6 +76,16 @@ async function despachar(): Promise<void> {
       const detalle = describe(error)
       await markFailed(pendiente.id, pendiente.attempts, detalle)
       console.error(`[envío] falló (intento ${pendiente.attempts}):`, detalle)
+      // Al tercer intento el mensaje se rinde: eso es un cliente (o el
+      // grupo) que se quedó esperando algo que nunca va a llegar.
+      if (pendiente.attempts >= 3) {
+        logEvent({
+          eventType: 'send.failed',
+          severity: 'error',
+          conversationId: pendiente.conversation_id,
+          payload: { intentos: pendiente.attempts, error: detalle.slice(0, 300) },
+        })
+      }
     }
   } catch (error) {
     console.error('[envío] error al reclamar:', describe(error))

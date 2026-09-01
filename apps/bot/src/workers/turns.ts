@@ -1,5 +1,7 @@
 import { loadEnv, hasLlm } from '../config/env.js'
 import { describe } from '../utils/errors.js'
+import { logEvent } from '../observability/events.js'
+import { notifyTurnFailed } from '../notifications/notify.js'
 import { buildSystemPrompt } from '../agents/context.js'
 import { chat, type Turn } from '../agents/llm.js'
 import {
@@ -7,6 +9,7 @@ import {
   enqueueSend,
   history,
   lastInboundId,
+  lastInboundPreview,
   type Conversation,
 } from '../db/queries.js'
 
@@ -36,6 +39,7 @@ async function responder(conversacion: Conversation): Promise<void> {
   // Esto es lo que evita contestar tres veces a tres mensajes seguidos.
   const ultimo = await lastInboundId(conversacion.id)
   if (ultimo && conversacion.last_inbound_id && ultimo !== conversacion.last_inbound_id) {
+    logEvent({ eventType: 'turn.superseded', conversationId: conversacion.id })
     return
   }
 
@@ -66,6 +70,11 @@ async function responder(conversacion: Conversation): Promise<void> {
     chatId: conversacion.chat_id,
     body: respuesta,
   })
+  logEvent({
+    eventType: 'turn.answered',
+    conversationId: conversacion.id,
+    payload: { chars: respuesta.length },
+  })
 }
 
 async function tick(): Promise<void> {
@@ -78,11 +87,31 @@ async function tick(): Promise<void> {
       try {
         await responder(conversacion)
       } catch (error) {
-        // Una conversación que falla no puede frenar a las demás.
-        console.error(
-          `[turno] falló en ${conversacion.chat_id}:`,
-          describe(error),
-        )
+        // Una conversación que falla no puede frenar a las demás. Pero un
+        // turno caído es un cliente MUDO: además de anotarlo, se avisa al
+        // grupo — el error silencioso es el peor de todos, porque el
+        // cliente escribe tres veces, nadie contesta y nadie se entera.
+        const detalle = describe(error)
+        console.error(`[turno] falló en ${conversacion.chat_id}:`, detalle)
+        logEvent({
+          eventType: 'turn.failed',
+          severity: 'error',
+          conversationId: conversacion.id,
+          payload: { error: detalle.slice(0, 300) },
+        })
+        try {
+          await notifyTurnFailed({
+            conversationId: conversacion.id,
+            chatId: conversacion.chat_id,
+            errorMessage: detalle,
+            lastMessage: (await lastInboundPreview(conversacion.id)) ?? undefined,
+            // La clave es el mensaje que disparó el turno: si el turno se
+            // re-ejecuta y vuelve a fallar, el grupo no recibe otro aviso.
+            episodeKey: conversacion.last_inbound_id ?? `caido:${conversacion.id}`,
+          })
+        } catch (notifyError) {
+          console.error('[turno] tampoco se pudo avisar al grupo:', describe(notifyError))
+        }
       }
     }
   } catch (error) {

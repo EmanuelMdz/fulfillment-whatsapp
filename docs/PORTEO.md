@@ -34,12 +34,18 @@ webhook del puente a `/webhook/whatsapp` y mandate un mensaje.
 
 ### Lo que falta portar
 
-- [ ] Proveedores, agentes, cola de envío, crons, observabilidad, utilidades — 68 archivos, entran tal cual
+> Nota (2026-09-01): el esqueleto reescribió proveedores, cola de envío y
+> turnos de cero, así que "portar tal cual" pasó a ser "adaptar la lógica
+> valiosa al esquema nuevo". Los archivos no se copian: se traducen.
+
+- [x] Utilidades: reintentos con espera creciente y fecha con día de semana para el prompt
+- [x] Observabilidad → tabla `event_log` + `logEvent()` con catálogo cerrado (0003)
+- [x] `notifications/` → avisos al grupo con idempotencia por episodio, por la cola de envío; incluye el aviso "el bot no pudo contestar" (turno caído)
 - [ ] `message-processor.ts` (2.024 ln) — portar entero y sacarle los pasos de envío y cobro a puntos de extensión
 - [ ] `knowledge-base.ts` + `kb-render.ts` (587 ln) — generalizar a producto o prestación
 - [ ] `create-order.ts` (453 ln) — sacarle los envíos, dejarlo genérico
-- [ ] `lead-state.ts` + `echo-handler.ts` — toma y devolución del control humano, tal cual
-- [ ] `notifications/` (443 ln) — avisos idempotentes por episodio, tal cual
+- [ ] `lead-state.ts` + `echo-handler.ts` — toma y devolución del control humano (la toma ya está en el esqueleto; falta la devolución con su invariante)
+- [ ] Seguimientos automáticos (followup-agent + schedule + crons)
 - [ ] `queries.ts` (1.336 ln) — podar lo que no aplica
 
 **Listo cuando** el bot contesta un WhatsApp real con prompts cargados desde la

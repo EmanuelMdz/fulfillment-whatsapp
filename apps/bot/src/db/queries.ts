@@ -219,20 +219,84 @@ export async function getCatalog(): Promise<
   }>
 }
 
-export async function getConfig(): Promise<{ business_name: string; labels: Record<string, string> }> {
-  const res = await db().from('app_config').select('business_name, labels').eq('id', 1).maybeSingle()
+export interface AppConfig {
+  pack: string
+  business_name: string
+  timezone: string
+  labels: Record<string, string>
+  order_stages: Array<{ key: string; label: string; final: boolean }>
+  escalation_reasons: Array<{ key: string; label: string }>
+  business_hours: Record<string, unknown>
+  notify_chat_id: string | null
+}
+
+/** La fila única de configuración. Si falta (instalación a medias), valores vacíos. */
+export async function getConfig(): Promise<AppConfig> {
+  const res = await db().from('app_config').select('*').eq('id', 1).maybeSingle()
   if (res.error) throw res.error
-  return (res.data as { business_name: string; labels: Record<string, string> }) ?? {
-    business_name: '',
-    labels: {},
-  }
+  return (
+    (res.data as AppConfig) ?? {
+      pack: 'ecommerce',
+      business_name: '',
+      timezone: 'America/Montevideo',
+      labels: {},
+      order_stages: [],
+      escalation_reasons: [],
+      business_hours: {},
+      notify_chat_id: null,
+    }
+  )
+}
+
+// ── Avisos al grupo ──────────────────────────────────────────
+
+/**
+ * Reclama el episodio de un aviso ANTES de mandarlo.
+ *
+ * true  → episodio nuevo: el que llama DEBE avisar.
+ * false → este episodio ya avisó: no se manda nada.
+ *
+ * Un error inesperado de la base devuelve true a propósito (fail-open):
+ * el grupo puede ignorar un aviso repetido, pero un aviso que se pierde
+ * — una venta esperando, un cliente mudo — no se recupera nunca.
+ */
+export async function claimNotificationEpisode(
+  scope: string,
+  kind: string,
+  episodeKey: string,
+): Promise<boolean> {
+  const res = await db()
+    .from('notification_episodes')
+    .insert({ scope, kind, episode_key: episodeKey })
+  if (!res.error) return true
+  if (res.error.code === '23505') return false
+  console.warn('[avisos] no se pudo reclamar el episodio (se avisa igual):', res.error.message)
+  return true
+}
+
+/** El texto del último mensaje del cliente, para incluirlo en un aviso. */
+export async function lastInboundPreview(conversationId: string): Promise<string | null> {
+  const res = await db()
+    .from('messages')
+    .select('body')
+    .eq('conversation_id', conversationId)
+    .eq('direction', 'in')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (res.error) return null
+  return (res.data?.body as string) ?? null
 }
 
 // ── Cola de envío ────────────────────────────────────────────
 
-/** Nadie manda mensajes: los escribe acá y el trabajador los saca de a uno. */
+/**
+ * Nadie manda mensajes: los escribe acá y el trabajador los saca de a uno.
+ * `conversationId` en null es un mensaje que no pertenece a ningún chat de
+ * cliente — por ejemplo, un aviso al grupo del negocio.
+ */
 export async function enqueueSend(input: {
-  conversationId: string
+  conversationId: string | null
   channel: string
   chatId: string
   body: string

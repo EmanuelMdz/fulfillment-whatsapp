@@ -30,6 +30,13 @@ export interface Env {
   port: number
   timezone: string
   logLevel: string
+  /**
+   * URL pública del servidor (la del deploy en Railway). Se usa para armar
+   * los links a la conversación en los avisos al grupo: WhatsApp solo hace
+   * clickeable lo que empieza con http(s)://. Sin esto, los avisos salen
+   * sin link.
+   */
+  publicUrl: string
   supabase: { url: string; serviceKey: string }
   whatsapp: { apiUrl: string; apiKey: string; session: string; webhookSecret: string }
   llm: { provider: 'gemini' | 'openai'; model: string; geminiKey: string; openaiKey: string }
@@ -57,6 +64,7 @@ export function loadEnv(): Env {
     port: num('PORT', 3000),
     timezone: optional('TIMEZONE', 'America/Montevideo'),
     logLevel: optional('LOG_LEVEL', 'info'),
+    publicUrl: optional('PUBLIC_URL').replace(/\/+$/, ''),
     supabase: {
       url: required('SUPABASE_URL'),
       serviceKey: required('SUPABASE_SERVICE_ROLE_KEY'),

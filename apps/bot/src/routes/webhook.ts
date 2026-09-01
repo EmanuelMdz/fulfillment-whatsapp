@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { loadEnv } from '../config/env.js'
 import { describe } from '../utils/errors.js'
+import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
 import {
   findMessageByExternalId,
@@ -70,6 +71,7 @@ webhookRoute.post('/', async (c) => {
       })
       await pauseForHuman(conversacion.id)
       console.log(`[webhook] humano tomó la conversación ${conversacion.chat_id}`)
+      logEvent({ eventType: 'conversation.human_takeover', conversationId: conversacion.id })
       return c.json({ ok: true, eco: 'humano' })
     }
 
@@ -99,7 +101,13 @@ webhookRoute.post('/', async (c) => {
   } catch (error) {
     // Guardamos el problema pero contestamos 200: reintentar no lo arregla
     // y sí duplica mensajes.
-    console.error('[webhook] falló:', describe(error))
+    const detalle = describe(error)
+    console.error('[webhook] falló:', detalle)
+    logEvent({
+      eventType: 'internal.error',
+      severity: 'error',
+      payload: { donde: 'webhook', error: detalle.slice(0, 300) },
+    })
     return c.json({ ok: true, error: 'anotado' })
   }
 })
