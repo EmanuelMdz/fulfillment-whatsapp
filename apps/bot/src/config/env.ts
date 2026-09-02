@@ -5,6 +5,13 @@
  * exactamente qué falta. Un arranque a medias es peor que uno que falla.
  */
 
+import { loadDotEnv } from './dotenv.js'
+
+// Antes de leer nada: el .env de la raíz entra en process.env. En el
+// hosting no hay archivo y las variables ya vienen inyectadas; ahí esto
+// no hace nada. Ver config/dotenv.ts.
+loadDotEnv()
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) {

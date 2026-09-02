@@ -252,6 +252,18 @@ export async function getConfig(): Promise<AppConfig> {
   )
 }
 
+/**
+ * Los módulos prendidos, tal cual están en la base ahora mismo.
+ *
+ * Lectura cruda y sin caché: el que la usa es `config/modules.ts`, que
+ * es el único que decide cada cuánto vale la pena volver a preguntar.
+ */
+export async function getEnabledModules(): Promise<string[]> {
+  const res = await db().from('modules').select('key').eq('enabled', true)
+  if (res.error) throw res.error
+  return (res.data ?? []).map((m) => m.key as string)
+}
+
 // ── Control de la conversación ───────────────────────────────
 
 /**

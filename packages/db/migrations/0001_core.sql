@@ -134,11 +134,13 @@ declare t text;
 begin
   foreach t in array array['app_config', 'modules', 'contacts', 'catalog_items', 'orders']
   loop
-    execute format(
-      'create policy equipo on public.%I for all to authenticated using (true) with check (true)',
-      t
-    );
-  exception when duplicate_object then null;
+    begin
+      execute format(
+        'create policy equipo on public.%I for all to authenticated using (true) with check (true)',
+        t
+      );
+    exception when duplicate_object then null;
+    end;
   end loop;
 end $$;
 
@@ -157,11 +159,13 @@ declare t text;
 begin
   foreach t in array array['app_config', 'contacts', 'catalog_items', 'orders']
   loop
-    execute format(
-      'create trigger %I_touch before update on public.%I for each row execute function public.touch_updated_at()',
-      t, t
-    );
-  exception when duplicate_object then null;
+    begin
+      execute format(
+        'create trigger %I_touch before update on public.%I for each row execute function public.touch_updated_at()',
+        t, t
+      );
+    exception when duplicate_object then null;
+    end;
   end loop;
 end $$;
 

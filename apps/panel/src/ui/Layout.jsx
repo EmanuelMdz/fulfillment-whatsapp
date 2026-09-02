@@ -1,16 +1,49 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { MessageSquare, Inbox, ClipboardList, Package, SlidersHorizontal, QrCode, FlaskConical, ChartNoAxesColumn, LogOut } from 'lucide-react'
+import {
+  MessageSquare,
+  Inbox,
+  ClipboardList,
+  Package,
+  SlidersHorizontal,
+  QrCode,
+  FlaskConical,
+  ChartNoAxesColumn,
+  Settings,
+  LogOut,
+} from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 /**
  * El esqueleto del panel: barra lateral en escritorio, barra superior
- * con solo íconos en el teléfono. El menú va a leer los módulos
- * prendidos cuando lleguen las pestañas opcionales (tanda 3).
+ * con solo íconos en el teléfono.
+ *
+ * El menú se ARMA, no se escribe a mano en el JSX. Dos motivos:
+ *
+ * - Las palabras salen del diccionario del negocio (`app_config.labels`),
+ *   así que "Pedidos" dice "Ventas" en una tienda y "Consultas" en una
+ *   clínica sin tocar este archivo.
+ * - Una entrada con `module` solo aparece si ese módulo está prendido en
+ *   la tabla `modules`. Cuando un módulo trae pantalla propia, se agrega
+ *   una línea acá con su clave y listo: apagarlo la saca del menú.
  */
+
+const MENU = [
+  { to: '/', end: true, icon: MessageSquare, texto: () => 'Conversaciones' },
+  { to: '/revision', icon: Inbox, texto: () => 'Revisión' },
+  { to: '/pedidos', icon: ClipboardList, texto: (l) => l.order_plural ?? 'Pedidos' },
+  { to: '/catalogo', icon: Package, texto: (l) => l.item_plural ?? 'Catálogo' },
+  { to: '/metricas', icon: ChartNoAxesColumn, texto: () => 'Métricas' },
+  { to: '/studio', icon: SlidersHorizontal, texto: () => 'Studio' },
+  { to: '/test', icon: FlaskConical, texto: () => 'Probar el bot' },
+  { to: '/conexion', icon: QrCode, texto: () => 'Conexión' },
+  { to: '/ajustes', icon: Settings, texto: () => 'Ajustes' },
+]
+
 export default function Layout() {
   const [nombreNegocio, setNombreNegocio] = useState('')
   const [labels, setLabels] = useState({})
+  const [prendidos, setPrendidos] = useState(null) // null = todavía no sabemos
 
   useEffect(() => {
     supabase
@@ -22,44 +55,28 @@ export default function Layout() {
         setNombreNegocio(data?.business_name || 'Panel')
         setLabels(data?.labels ?? {})
       })
+    supabase
+      .from('modules')
+      .select('key')
+      .eq('enabled', true)
+      .then(({ data }) => setPrendidos(new Set((data ?? []).map((m) => m.key))))
   }, [])
+
+  // Mientras no sepamos qué módulos están prendidos, mostramos solo el
+  // núcleo: es preferible que una pestaña aparezca un instante después a
+  // que parpadee y desaparezca.
+  const visible = (entrada) => !entrada.module || Boolean(prendidos?.has(entrada.module))
 
   return (
     <div className="shell">
       <nav className="sidebar">
         <div className="brand" title={nombreNegocio}>{nombreNegocio || 'Panel'}</div>
-        <NavLink to="/" end>
-          <MessageSquare size={17} />
-          <span>Conversaciones</span>
-        </NavLink>
-        <NavLink to="/revision">
-          <Inbox size={17} />
-          <span>Revisión</span>
-        </NavLink>
-        <NavLink to="/pedidos">
-          <ClipboardList size={17} />
-          <span>{labels.order_plural ?? 'Pedidos'}</span>
-        </NavLink>
-        <NavLink to="/catalogo">
-          <Package size={17} />
-          <span>{labels.item_plural ?? 'Catálogo'}</span>
-        </NavLink>
-        <NavLink to="/metricas">
-          <ChartNoAxesColumn size={17} />
-          <span>Métricas</span>
-        </NavLink>
-        <NavLink to="/studio">
-          <SlidersHorizontal size={17} />
-          <span>Studio</span>
-        </NavLink>
-        <NavLink to="/test">
-          <FlaskConical size={17} />
-          <span>Probar el bot</span>
-        </NavLink>
-        <NavLink to="/conexion">
-          <QrCode size={17} />
-          <span>Conexión</span>
-        </NavLink>
+        {MENU.filter(visible).map(({ to, end, icon: Icono, texto }) => (
+          <NavLink key={to} to={to} end={end}>
+            <Icono size={17} />
+            <span>{texto(labels)}</span>
+          </NavLink>
+        ))}
         <div className="spacer" />
         <button className="logout" onClick={() => supabase.auth.signOut()}>
           <LogOut size={17} />

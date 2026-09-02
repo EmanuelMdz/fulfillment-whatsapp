@@ -76,8 +76,13 @@ minutos.
 
 ## Tanda 3 — Los dos packs
 
-- [ ] Banderas de módulos y menú dinámico
-- [ ] Diccionario, estados y motivos editables desde el panel
+- [x] Banderas de módulos y menú dinámico — el menú se arma de una lista
+  (`MENU` en `ui/Layout.jsx`): las palabras salen del diccionario y una entrada
+  con `module` solo aparece si ese módulo está prendido. En el servidor el
+  corte es `config/modules.ts` (`isModuleEnabled`, caché de 30s)
+- [x] Diccionario, estados y motivos editables desde el panel — página
+  **Ajustes**. La clave nunca se edita (hay pedidos guardados con ella), la
+  etiqueta sí; un estado con pedidos adentro no se deja borrar
 - [ ] Módulos `stock`, `payments`, `vision`, `audio`
 - [ ] **Nuevo**: módulo `hours` — horario de atención
 - [ ] **Nuevo**: módulo `team` — asignar casos a personas
