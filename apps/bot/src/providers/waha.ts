@@ -1,4 +1,4 @@
-import { loadEnv, hasWhatsapp } from '../config/env.js'
+import { ensureWebhookSecret, getSettings, hasWhatsapp } from '../config/settings.js'
 import type { InboundMessage, MessageProvider } from './types.js'
 
 /**
@@ -8,6 +8,10 @@ import type { InboundMessage, MessageProvider } from './types.js'
  * Funciona muy bien y se conecta escaneando un código QR, pero implica
  * riesgo de que bloqueen el número. Por eso todo sale por la cola de envío,
  * de a uno y con pausas. Ver workers/send-queue.ts.
+ *
+ * La URL, la clave y el nombre de la sesión vienen del panel (pestaña
+ * Conexión), no del entorno: por eso cada llamada los pide de nuevo a
+ * settings (que los tiene en caché).
  */
 
 interface WahaEnvelope {
@@ -22,23 +26,24 @@ interface WahaEnvelope {
     body?: string
     hasMedia?: boolean
     media?: { url?: string; mimetype?: string } | null
-    _data?: { notifyName?: string } | null
+    _data?: { notifyName?: string; pushName?: string } | null
   }
 }
 
 export class WahaProvider implements MessageProvider {
   readonly channel = 'whatsapp' as const
 
-  private get cfg() {
-    return loadEnv().whatsapp
+  private async cfg() {
+    return (await getSettings()).whatsapp
   }
 
-  isReady(): boolean {
-    return hasWhatsapp(loadEnv())
+  async isReady(): Promise<boolean> {
+    return hasWhatsapp(await getSettings())
   }
 
   private async call<T>(path: string, body?: unknown, method = 'POST'): Promise<T> {
-    const { apiUrl, apiKey } = this.cfg
+    const { apiUrl, apiKey } = await this.cfg()
+    if (!apiUrl) throw new Error('Falta la URL del puente de WhatsApp: cargala en el panel, pestaña Conexión')
     const res = await fetch(`${apiUrl}${path}`, {
       method,
       headers: {
@@ -58,9 +63,15 @@ export class WahaProvider implements MessageProvider {
     return (text ? JSON.parse(text) : {}) as T
   }
 
+  /** ¿La URL y la clave son correctas? Lista las sesiones: 401 si la clave está mal. */
+  async ping(): Promise<void> {
+    await this.call('/api/sessions', undefined, 'GET')
+  }
+
   async sendText(chatId: string, text: string): Promise<{ externalId: string | null }> {
+    const { session } = await this.cfg()
     const sent = await this.call<{ id?: string | { _serialized?: string } }>('/api/sendText', {
-      session: this.cfg.session,
+      session,
       chatId,
       text,
     })
@@ -71,16 +82,19 @@ export class WahaProvider implements MessageProvider {
   }
 
   async startTyping(chatId: string): Promise<void> {
-    await this.call('/api/startTyping', { session: this.cfg.session, chatId })
+    const { session } = await this.cfg()
+    await this.call('/api/startTyping', { session, chatId })
   }
 
   async stopTyping(chatId: string): Promise<void> {
-    await this.call('/api/stopTyping', { session: this.cfg.session, chatId })
+    const { session } = await this.cfg()
+    await this.call('/api/stopTyping', { session, chatId })
   }
 
   async sessionStatus(): Promise<{ status: string }> {
+    const { session } = await this.cfg()
     const res = await this.call<{ status?: string }>(
-      `/api/sessions/${encodeURIComponent(this.cfg.session)}`,
+      `/api/sessions/${encodeURIComponent(session)}`,
       undefined,
       'GET',
     )
@@ -92,15 +106,14 @@ export class WahaProvider implements MessageProvider {
    * al servidor. Después de esto la sesión queda esperando el escaneo del
    * QR — ver qrImage().
    *
-   * El secreto viaja como query del webhook porque es lo único que
-   * funciona igual en cualquier versión del puente; el webhook lo acepta
-   * por query o por header.
+   * El secreto lo genera el servidor (ver settings.ts) y viaja como query
+   * del webhook porque es lo único que funciona igual en cualquier
+   * versión del puente; el webhook lo acepta por query o por header.
    */
   async startSession(webhookUrl: string): Promise<void> {
-    const { session, webhookSecret } = this.cfg
-    const url = webhookSecret
-      ? `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}secret=${encodeURIComponent(webhookSecret)}`
-      : webhookUrl
+    const { session } = await this.cfg()
+    const secret = await ensureWebhookSecret()
+    const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}secret=${encodeURIComponent(secret)}`
     const body = {
       name: session,
       start: true,
@@ -123,7 +136,7 @@ export class WahaProvider implements MessageProvider {
    * (ya vinculada, o todavía arrancando).
    */
   async qrImage(): Promise<string | null> {
-    const { apiUrl, apiKey, session } = this.cfg
+    const { apiUrl, apiKey, session } = await this.cfg()
     const res = await fetch(
       `${apiUrl}/api/${encodeURIComponent(session)}/auth/qr?format=image`,
       { headers: { 'X-Api-Key': apiKey, Accept: 'image/png' } },
@@ -131,6 +144,20 @@ export class WahaProvider implements MessageProvider {
     if (!res.ok) return null
     const buf = Buffer.from(await res.arrayBuffer())
     return `data:image/png;base64,${buf.toString('base64')}`
+  }
+
+  /**
+   * Los grupos del número conectado, para elegir el de avisos desde una
+   * lista. Nadie sabe el id interno de su grupo; el nombre sí.
+   */
+  async listGroups(): Promise<Array<{ id: string; name: string }>> {
+    const { session } = await this.cfg()
+    const res = await this.call<Array<{ id: string; subject?: string; name?: string }>>(
+      `/api/${encodeURIComponent(session)}/groups?exclude=participants`,
+      undefined,
+      'GET',
+    )
+    return (Array.isArray(res) ? res : []).map((g) => ({ id: g.id, name: g.subject || g.name || g.id }))
   }
 
   parseWebhook(payload: unknown): InboundMessage | null {
@@ -147,9 +174,19 @@ export class WahaProvider implements MessageProvider {
     const chatId = (isEcho ? p.to : p.from) ?? ''
     if (!chatId) return null
 
+    // Grupos, estados y canales no son conversaciones de clientes. El
+    // grupo de avisos del negocio entra por acá: sin este corte, el bot
+    // crea una "conversación" con el grupo y le contesta al equipo.
+    if (chatId.endsWith('@g.us') || chatId.endsWith('@broadcast') || chatId.endsWith('@newsletter')) {
+      return null
+    }
+
+    // Aunque el puente no haya bajado el archivo, saber que HAY uno
+    // importa: el turno le dice al modelo "mandó una imagen" en vez de
+    // pasarle un mensaje vacío.
     const mimetype = p.media?.mimetype ?? ''
-    const media = p.media?.url
-      ? { url: p.media.url, kind: mimetype.split('/')[0] || 'file' }
+    const media = p.hasMedia || p.media?.url
+      ? { url: p.media?.url ?? '', kind: mimetype.split('/')[0] || 'file' }
       : null
 
     return {
@@ -158,7 +195,8 @@ export class WahaProvider implements MessageProvider {
       from: chatId.split('@')[0] ?? chatId,
       text: p.body ?? '',
       timestamp: p.timestamp ? new Date(p.timestamp * 1000) : new Date(),
-      displayName: p._data?.notifyName || undefined,
+      // notifyName es de WEBJS; pushName de NOWEB y GOWS.
+      displayName: p._data?.notifyName || p._data?.pushName || undefined,
       media,
       isEcho,
     }

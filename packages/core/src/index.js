@@ -7,16 +7,24 @@
  * instalación que ya corrió el instalador — es a propósito.
  */
 
-/** Módulos que se pueden prender y apagar. El núcleo no está acá: siempre va. */
+export { SEEDS } from './seeds.js'
+
+/**
+ * Módulos que se pueden prender y apagar. El núcleo no está acá: siempre va.
+ *
+ * `available: false` marca los que todavía no tienen código: el panel los
+ * muestra como "próximamente" y no deja prenderlos. Un interruptor que
+ * no hace nada es peor que no tenerlo.
+ */
 export const MODULES = [
-  { key: 'stock', label: 'Inventario', description: 'existencias y aviso de faltante' },
-  { key: 'payments', label: 'Cobros', description: 'link de pago' },
-  { key: 'vision', label: 'Imágenes', description: 'leer fotos y comprobantes' },
-  { key: 'audio', label: 'Audios', description: 'transcribir notas de voz' },
-  { key: 'shipping', label: 'Envíos', description: 'conector propio, por defecto no hace nada' },
-  { key: 'ads', label: 'Anuncios', description: 'de qué aviso vino el chat' },
-  { key: 'hours', label: 'Horarios', description: 'atención por franja' },
-  { key: 'team', label: 'Equipo', description: 'asignar casos a personas' },
+  { key: 'stock', label: 'Inventario', description: 'existencias y aviso de faltante', available: true },
+  { key: 'payments', label: 'Cobros', description: 'link de pago', available: true },
+  { key: 'vision', label: 'Imágenes', description: 'leer fotos y comprobantes', available: true },
+  { key: 'audio', label: 'Audios', description: 'transcribir notas de voz', available: true },
+  { key: 'shipping', label: 'Envíos', description: 'conector propio, por defecto no hace nada', available: false },
+  { key: 'ads', label: 'Anuncios', description: 'de qué aviso vino el chat', available: false },
+  { key: 'hours', label: 'Horarios', description: 'atención por franja', available: true },
+  { key: 'team', label: 'Equipo', description: 'asignar casos a personas', available: true },
 ]
 
 /** Lo que siempre está, en cualquier instalación. Se lista para el panel. */

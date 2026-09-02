@@ -43,7 +43,17 @@ export default function Conversaciones() {
   const seleccionada = searchParams.get('chat')
   const [verFicha, setVerFicha] = useState(false)
   const [ficha, setFicha] = useState(null) // {contacto, pedidos}
+  const [moneda, setMoneda] = useState('$')
   const finHilo = useRef(null)
+
+  useEffect(() => {
+    supabase
+      .from('app_config')
+      .select('currency')
+      .eq('id', 1)
+      .maybeSingle()
+      .then(({ data }) => setMoneda(data?.currency || '$'))
+  }, [])
 
   const conv = lista.find((c) => c.id === seleccionada) ?? null
 
@@ -237,7 +247,7 @@ export default function Conversaciones() {
                       <div className="inbox-item" key={p.id}>
                         <div className="body">
                           <div className="title">
-                            ${p.total}{' '}
+                            {moneda}{p.total}{' '}
                             <span className="muted" style={{ fontWeight: 400 }}>
                               · {p.stage} · {new Date(p.created_at).toLocaleDateString('es-UY')}
                             </span>

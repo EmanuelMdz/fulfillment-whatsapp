@@ -9,9 +9,30 @@
  * La zona horaria viene de la configuración del negocio (app_config), no
  * de este archivo: cada instalación vive en su propio huso.
  */
+
+const avisadas = new Set<string>()
+
+/**
+ * Una zona horaria mal escrita ("America/Montevideoo") hace explotar
+ * toLocaleString en CADA turno: el bot queda mudo por un error de tipeo
+ * en el panel. UTC con un aviso en consola es mejor que un bot mudo.
+ */
+export function safeTimezone(tz: string): string {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return tz
+  } catch {
+    if (!avisadas.has(tz)) {
+      avisadas.add(tz)
+      console.warn(`[fecha] zona horaria inválida "${tz}", se usa UTC hasta que la corrijan en el panel`)
+    }
+    return 'UTC'
+  }
+}
+
 export function formatNowForPrompt(timezone: string, at: Date = new Date()): string {
   return at.toLocaleString('es-AR', {
-    timeZone: timezone,
+    timeZone: safeTimezone(timezone),
     weekday: 'long',
     day: '2-digit',
     month: '2-digit',

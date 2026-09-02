@@ -1,4 +1,4 @@
-import { loadEnv } from '../config/env.js'
+import { getSettings, hasWhatsapp, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
@@ -29,6 +29,7 @@ import { claimNextSend, markFailed, markSent, saveMessage } from '../db/queries.
  */
 
 let corriendo = false
+let avisoSinPuente = false
 
 function pausaAlAzar(minMs: number, maxMs: number): Promise<void> {
   const ms = minMs + Math.random() * Math.max(0, maxMs - minMs)
@@ -41,11 +42,19 @@ async function despachar(): Promise<void> {
   if (corriendo) return
   corriendo = true
 
-  const env = loadEnv()
   const provider = whatsapp()
 
   try {
-    if (!provider.isReady()) return
+    const s = await getSettings()
+    if (!hasWhatsapp(s)) {
+      // Sin puente, la cola espera. Se avisa una vez, no cada ocho segundos.
+      if (!avisoSinPuente) {
+        console.log('[envío] WhatsApp sin configurar — los mensajes esperan en la cola (panel → Conexión)')
+        avisoSinPuente = true
+      }
+      return
+    }
+    avisoSinPuente = false
 
     const pendiente = await claimNextSend()
     if (!pendiente) return
@@ -53,7 +62,7 @@ async function despachar(): Promise<void> {
     try {
       // Simular que se escribe. Si el puente no lo soporta, no importa.
       await provider.startTyping(pendiente.chat_id).catch(() => {})
-      await pausaAlAzar(env.bot.sendPauseMinMs, env.bot.sendPauseMaxMs)
+      await pausaAlAzar(s.bot.sendPauseMinMs, s.bot.sendPauseMaxMs)
       await provider.stopTyping(pendiente.chat_id).catch(() => {})
 
       const { externalId } = await provider.sendText(pendiente.chat_id, pendiente.body)
@@ -62,7 +71,8 @@ async function despachar(): Promise<void> {
       // Se guarda con el id que devolvió el puente. Gracias a eso, cuando
       // el eco de este mismo mensaje vuelva por el webhook, lo vamos a
       // reconocer como propio y no lo vamos a confundir con una persona
-      // contestando desde el celular.
+      // contestando desde el celular. (Si el eco llega antes que esto, el
+      // webhook pregunta a la cola: ver recentlySentByUs.)
       if (pendiente.conversation_id) {
         await saveMessage({
           conversationId: pendiente.conversation_id,
@@ -95,9 +105,8 @@ async function despachar(): Promise<void> {
 }
 
 export function startSendQueue(): void {
-  const env = loadEnv()
   setInterval(() => {
     void despachar()
-  }, env.bot.sendTickMs)
-  console.log(`[envío] cola activa, revisando cada ${env.bot.sendTickMs / 1000}s`)
+  }, TICK_MS.send)
+  console.log(`[envío] cola activa, revisando cada ${TICK_MS.send / 1000}s`)
 }

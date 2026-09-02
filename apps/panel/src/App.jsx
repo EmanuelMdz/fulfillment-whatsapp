@@ -10,6 +10,7 @@ import TestChat from './pages/TestChat.jsx'
 import Metricas from './pages/Metricas.jsx'
 import Conexion from './pages/Conexion.jsx'
 import Ajustes from './pages/Ajustes.jsx'
+import Instalar from './pages/Instalar.jsx'
 
 /**
  * Las rutas del panel. El servidor devuelve index.html para cualquier
@@ -30,6 +31,8 @@ export default function App() {
             <Route path="/metricas" element={<Metricas />} />
             <Route path="/conexion" element={<Conexion />} />
             <Route path="/ajustes" element={<Ajustes />} />
+            {/* Ya instalado: la misma pantalla aplica las migraciones nuevas. */}
+            <Route path="/instalar" element={<Instalar />} />
             <Route path="*" element={<Conversaciones />} />
           </Route>
         </Routes>

@@ -26,16 +26,20 @@ export default function Catalogo() {
   const [seleccion, setSeleccion] = useState(null) // null = nada, 'nuevo' = alta
   const [form, setForm] = useState(VACIO)
   const [labels, setLabels] = useState({})
+  const [moneda, setMoneda] = useState('$')
   const [aviso, setAviso] = useState(null)
   const [guardando, setGuardando] = useState(false)
 
   const cargar = useCallback(async () => {
     const [itemsRes, configRes] = await Promise.all([
       supabase.from('catalog_items').select('*').order('sort').order('created_at'),
-      supabase.from('app_config').select('labels').eq('id', 1).maybeSingle(),
+      supabase.from('app_config').select('labels, currency').eq('id', 1).maybeSingle(),
     ])
     if (!itemsRes.error) setItems(itemsRes.data ?? [])
-    if (!configRes.error) setLabels(configRes.data?.labels ?? {})
+    if (!configRes.error) {
+      setLabels(configRes.data?.labels ?? {})
+      setMoneda(configRes.data?.currency || '$')
+    }
   }, [])
 
   useEffect(() => {
@@ -108,7 +112,7 @@ export default function Catalogo() {
               <div className="title">
                 {item.name}{' '}
                 <span className="muted" style={{ fontWeight: 400 }}>
-                  · ${item.price}
+                  · {moneda}{item.price}
                   {item.track_stock ? ` · stock: ${item.stock_qty}` : ''}
                 </span>{' '}
                 {!item.active && <span className="chip">inactivo</span>}

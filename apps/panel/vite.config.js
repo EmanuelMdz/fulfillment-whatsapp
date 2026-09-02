@@ -8,8 +8,6 @@ import react from '@vitejs/plugin-react'
  */
 export default defineConfig({
   plugins: [react()],
-  // El .env vive en la raíz del repo (uno solo para servidor y panel).
-  envDir: '../..',
   build: {
     outDir: '../bot/public',
     emptyOutDir: true,
@@ -19,6 +17,8 @@ export default defineConfig({
     proxy: {
       '/health': 'http://localhost:3000',
       '/api': 'http://localhost:3000',
+      // La config pública (URL y clave anon de Supabase) también la da el servidor.
+      '/config.js': 'http://localhost:3000',
     },
   },
 })

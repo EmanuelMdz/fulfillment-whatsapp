@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { loadEnv } from '../config/env.js'
+import { getSettings } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
@@ -8,6 +8,7 @@ import {
   findMessageByExternalId,
   findOrCreateConversation,
   pauseForHuman,
+  recentlySentByUs,
   reopenConversation,
   saveMessage,
   scheduleTurn,
@@ -27,14 +28,15 @@ import {
 export const webhookRoute = new Hono()
 
 webhookRoute.post('/', async (c) => {
-  const env = loadEnv()
+  const s = await getSettings()
 
-  // El secreto es opcional en desarrollo, obligatorio si está configurado.
-  if (env.whatsapp.webhookSecret) {
-    const recibido = c.req.header('x-webhook-secret') ?? c.req.query('secret')
-    if (recibido !== env.whatsapp.webhookSecret) {
-      return c.json({ error: 'secreto inválido' }, 401)
-    }
+  // El secreto es OBLIGATORIO. Lo genera el servidor al arrancar la
+  // sesión desde el panel y viaja en la URL del webhook. Sin esto,
+  // cualquiera que conozca la URL puede hacerle decir cosas al bot —
+  // desde el número del negocio, con la clave de IA del negocio.
+  const recibido = c.req.header('x-webhook-secret') ?? c.req.query('secret')
+  if (!s.whatsapp.webhookSecret || recibido !== s.whatsapp.webhookSecret) {
+    return c.json({ error: 'secreto inválido' }, 401)
   }
 
   let payload: unknown
@@ -58,8 +60,12 @@ webhookRoute.post('/', async (c) => {
     if (mensaje.isEcho) {
       const yaGuardado = await findMessageByExternalId(conversacion.id, mensaje.externalId)
 
-      // Si ya lo teníamos, lo mandamos nosotros por la cola. Nada que hacer.
-      if (yaGuardado) return c.json({ ok: true, eco: 'propio' })
+      // Si ya lo teníamos, lo mandamos nosotros por la cola. Y si todavía
+      // no está guardado pero la cola lo acaba de mandar, también es
+      // nuestro: el eco le ganó la carrera al guardado.
+      if (yaGuardado || (await recentlySentByUs(mensaje.chatId, mensaje.text))) {
+        return c.json({ ok: true, eco: 'propio' })
+      }
 
       // No lo teníamos: lo escribió una persona desde el celular.
       // El bot se calla hasta que lo devuelvan.
@@ -87,7 +93,7 @@ webhookRoute.post('/', async (c) => {
       direction: 'in',
       author: 'customer',
       body: mensaje.text,
-      mediaUrl: mensaje.media?.url ?? null,
+      mediaUrl: mensaje.media?.url || null,
       mediaKind: mensaje.media?.kind ?? null,
       providerTs: mensaje.timestamp,
     })
@@ -114,8 +120,8 @@ webhookRoute.post('/', async (c) => {
       return c.json({ ok: true, guardado: true, turno: 'no, está con un humano' })
     }
 
-    await scheduleTurn(conversacion.id, mensajeId, env.bot.debounceSeconds)
-    return c.json({ ok: true, guardado: true, turno: `en ${env.bot.debounceSeconds}s` })
+    await scheduleTurn(conversacion.id, mensajeId, s.bot.debounceSeconds)
+    return c.json({ ok: true, guardado: true, turno: `en ${s.bot.debounceSeconds}s` })
   } catch (error) {
     // Guardamos el problema pero contestamos 200: reintentar no lo arregla
     // y sí duplica mensajes.

@@ -20,7 +20,7 @@ export default function Metricas() {
   useEffect(() => {
     const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     async function cargar() {
-      const [nuevas, turnos, derivaciones, seguimientos, caidos, enRevision, pedidosRes] =
+      const [nuevas, turnos, derivaciones, seguimientos, caidos, enRevision, pedidosRes, configRes] =
         await Promise.all([
           contar('conversations', [['gte', 'created_at', desde]]),
           contar('event_log', [['eq', 'event_type', 'turn.answered'], ['gte', 'created_at', desde]]),
@@ -29,9 +29,11 @@ export default function Metricas() {
           contar('event_log', [['eq', 'event_type', 'turn.failed'], ['gte', 'created_at', desde]]),
           contar('review_queue', [['eq', 'status', 'open']]),
           supabase.from('orders').select('total').eq('source', 'bot').gte('created_at', desde),
+          supabase.from('app_config').select('currency').eq('id', 1).maybeSingle(),
         ])
       const pedidos = pedidosRes.error ? [] : (pedidosRes.data ?? [])
       setKpis({
+        moneda: configRes.data?.currency || '$',
         nuevas,
         turnos,
         derivaciones,
@@ -49,7 +51,7 @@ export default function Metricas() {
     ? [
         { titulo: 'Chats nuevos', valor: kpis.nuevas },
         { titulo: 'Respuestas del bot', valor: kpis.turnos },
-        { titulo: 'Pedidos del bot', valor: `${kpis.pedidos} · $${kpis.pedidosTotal}` },
+        { titulo: 'Pedidos del bot', valor: `${kpis.pedidos} · ${kpis.moneda}${kpis.pedidosTotal}` },
         { titulo: 'Seguimientos enviados', valor: kpis.seguimientos },
         { titulo: 'Derivaciones', valor: kpis.derivaciones },
         { titulo: 'En revisión ahora', valor: kpis.enRevision },

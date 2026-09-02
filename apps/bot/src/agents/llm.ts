@@ -1,11 +1,12 @@
-import { loadEnv } from '../config/env.js'
+import { getSettings, type Settings } from '../config/settings.js'
 
 /**
  * Una sola función para hablar con el modelo, con dos proveedores detrás.
  *
- * Se elige con LLM_PROVIDER y LLM_MODEL. Los nombres de modelo cambian
- * seguido: si esto devuelve un 404, casi siempre es que el modelo del .env
- * ya no existe. Por eso el error incluye el nombre.
+ * El proveedor, el modelo y la clave salen de la configuración del panel
+ * (Studio → Modelo de IA). Los nombres de modelo cambian seguido: si esto
+ * devuelve un 404, casi siempre es que el modelo que está en el panel ya
+ * no existe. Por eso el error incluye el nombre.
  */
 
 export interface Turn {
@@ -13,14 +14,19 @@ export interface Turn {
   content: string
 }
 
+type Llm = Settings['llm']
+
 export async function chat(system: string, turns: Turn[]): Promise<string> {
-  const { llm } = loadEnv()
-  return llm.provider === 'openai' ? openai(system, turns) : gemini(system, turns)
+  const { llm } = await getSettings()
+  // Un turno con texto vacío hace que Gemini rechace el pedido ENTERO
+  // (400). Lo vacío ya viene traducido a "(mandó un archivo)" desde el
+  // turno; esto es la última red.
+  const limpios = turns.filter((t) => t.content.trim())
+  return llm.provider === 'openai' ? openai(llm, system, limpios) : gemini(llm, system, limpios)
 }
 
-async function gemini(system: string, turns: Turn[]): Promise<string> {
-  const { llm } = loadEnv()
-  if (!llm.geminiKey) throw new Error('Falta GEMINI_API_KEY')
+async function gemini(llm: Llm, system: string, turns: Turn[]): Promise<string> {
+  if (!llm.geminiKey) throw new Error('Falta la clave de Gemini: cargala en el panel, pestaña Studio')
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${llm.model}:generateContent?key=${llm.geminiKey}`
   const res = await fetch(url, {
@@ -48,9 +54,8 @@ async function gemini(system: string, turns: Turn[]): Promise<string> {
   return parts.map((p) => p.text ?? '').join('').trim()
 }
 
-async function openai(system: string, turns: Turn[]): Promise<string> {
-  const { llm } = loadEnv()
-  if (!llm.openaiKey) throw new Error('Falta OPENAI_API_KEY')
+async function openai(llm: Llm, system: string, turns: Turn[]): Promise<string> {
+  if (!llm.openaiKey) throw new Error('Falta la clave de OpenAI: cargala en el panel, pestaña Studio')
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

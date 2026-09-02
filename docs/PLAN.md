@@ -55,10 +55,11 @@ sistema que anda y un producto que otro puede instalar.
 
 ## Lo que cuesta tenerlo prendido
 
-Servidor siempre encendido en Railway, entre cinco y siete dólares por mes. Base
-de datos, gratis para empezar. Puente de WhatsApp, a definir según si la versión
-libre alcanza para imágenes y audios. Modelos de IA, centavos por conversación. Y
-un número de WhatsApp dedicado, nunca el personal.
+Servidor siempre encendido en Railway más el puente de WhatsApp en el mismo
+proyecto: entre diez y quince dólares por mes por instalación. Base de datos,
+gratis para empezar. El puente (WAHA) es gratis desde su versión 2026.6.1,
+imágenes y audios incluidos. Modelos de IA, centavos por conversación. Y un
+número de WhatsApp dedicado, nunca el personal.
 
 El paso a paso para ponerlo en línea está en `DEPLOY.md`.
 
@@ -66,8 +67,9 @@ El paso a paso para ponerlo en línea está en `DEPLOY.md`.
 
 - **Nombre.** "Fulfillment" promete logística, que es justo lo que queda afuera.
   Alternativas sobre la mesa: Ciclo, Mostrador.
-- **Puente de WhatsApp.** Confirmar si la versión libre maneja imágenes y audios.
-  Cambia el costo por alumno.
+- ~~**Puente de WhatsApp.** Confirmar si la versión libre maneja imágenes y audios.~~
+  Cerrada el 1 de setiembre de 2026: desde WAHA 2026.6.1 todo es gratis
+  (sesiones ilimitadas, multimedia, almacenamiento). Ver `AUDITORIA.md`, punto 3.
 - **Agenda.** Un pedido en estado "agendado" con fecha alcanza para arrancar una
   clínica. Una agenda de verdad —grilla por profesional, duración, choques,
   recordatorio— es un módulo entero y suma dos o tres semanas.

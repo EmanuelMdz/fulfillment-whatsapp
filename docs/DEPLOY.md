@@ -1,44 +1,97 @@
 # Poner el sistema en línea
 
-Un solo servicio: el mismo proceso sirve el panel, recibe el webhook de
-WhatsApp y corre los crons. Una URL, un lugar donde mirar los registros.
+Tres piezas, un solo lugar donde mirar: **Supabase** (la base y el login),
+**Railway** (el servidor y el puente de WhatsApp). Veinte minutos, sin
+terminal.
 
-**Railway** es lo recomendado. Render sirve igual; lo único que cambia es que
-su plan gratuito duerme el servicio, y un servicio dormido no manda
-seguimientos ni se da cuenta de que el número se desconectó.
+Railway es lo recomendado. Render sirve igual; lo único que cambia es que su
+plan gratuito duerme el servicio, y un servicio dormido no manda seguimientos
+ni se da cuenta de que el número se desconectó.
 
 ---
 
-## Los siete pasos
+## 1. Supabase — la base
 
-1. **Creá tu proyecto de Supabase** y aplicá las migraciones de
-   `packages/db/migrations` en orden, desde el editor SQL.
+1. https://supabase.com → **New project**. Elegí la región más cercana.
+2. **Settings → API**. Copiá tres cosas: **Project URL**, la clave
+   **anon public** y la clave **service_role**.
+3. **Authentication → Sign In / Providers** → desactivá **"Allow new users to
+   sign up"**. Los usuarios los crea el panel; con esto prendido, cualquiera
+   podría registrarse. (El sistema igual no le muestra nada a quien no sea
+   del equipo, pero mejor cerrar la puerta.)
 
-2. **En Railway**: New Project → Deploy from GitHub repo → elegí este repo.
-   Detecta que es Node y usa `railway.json`. No hay nada que configurar.
+## 2. Railway — el servidor
 
-3. **Cargá las variables** en Variables. Son las de `.env.example`. Las dos
-   imprescindibles para que arranque son `SUPABASE_URL` y
-   `SUPABASE_SERVICE_ROLE_KEY`; si falta alguna, el servidor no levanta y te
-   dice cuál.
+1. https://railway.app → **New Project → Deploy from GitHub repo** → este
+   repo. Detecta que es Node y usa `railway.json`.
+2. Pestaña **Variables → Raw Editor** → pegá esto con tus tres valores:
+
+   ```
+   SUPABASE_URL=https://TU_PROYECTO.supabase.co
+   SUPABASE_ANON_KEY=eyJ...
+   SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   ```
 
    **No cargues `PORT`.** Railway la inyecta sola y pisarla rompe el despliegue.
+   No hay más variables: todo lo demás se configura desde el panel.
 
-4. **Generá el dominio**: Settings → Networking → Generate Domain. Te queda algo
-   como `tu-proyecto.up.railway.app`. Esa es la URL de todo: del panel, del
-   webhook y de la API.
+3. **Settings → Networking → Generate Domain**. Esa es la URL de todo: del
+   panel, del webhook y de la API.
+4. Abrí la URL. El **asistente de instalación** te pide pegar un SQL en
+   Supabase (SQL Editor → New query → pegar → Run), después el nombre del
+   negocio, el pack y tu usuario. Listo: entrás al panel.
 
-5. **Verificá que esté vivo**: entrá a `https://tu-dominio/health`. Tiene que
-   responder `ok: true` y decirte si WhatsApp está configurado.
+## 3. Railway — el puente de WhatsApp (WAHA)
 
-6. **Entrá al panel** en la raíz del dominio y conectá el número escaneando el
-   código QR. El panel deja el webhook apuntado solo.
+El puente es el servicio que maneja la sesión de WhatsApp Web. Va en el
+**mismo proyecto** de Railway, como un segundo servicio.
 
-7. **Mandate un mensaje** desde otro teléfono. Si contesta, terminaste.
+1. **+ New → Docker Image** → `devlikeapro/waha`.
+2. **Variables → Raw Editor**:
+
+   ```
+   WHATSAPP_API_KEY=inventá-una-clave-larga-y-guardala
+   WAHA_DASHBOARD_USERNAME=admin
+   WAHA_DASHBOARD_PASSWORD=inventá-otra
+   WHATSAPP_DEFAULT_ENGINE=WEBJS
+   ```
+
+3. **Settings → Volumes → Add Volume** → mount path `/app/.sessions`.
+   **Sin esto, cada redeploy del puente pide escanear el QR de nuevo.**
+4. **Settings → Networking → Generate Domain**. Cuando pregunte el puerto:
+   **3000**.
+
+## 4. Conectar
+
+1. Panel → **Conexión**: pegá la URL del puente y la clave
+   (`WHATSAPP_API_KEY`). Tocá **Probar conexión**.
+2. **Arrancar la sesión** → escaneá el QR con el número **DEDICADO** del
+   negocio (WhatsApp → Dispositivos vinculados → Vincular dispositivo).
+3. Panel → **Studio**: pegá la clave de Gemini (gratis en
+   https://aistudio.google.com/apikey). Tocá **Probar clave y modelo**.
+4. Panel → **Studio**: elegí el grupo de avisos del equipo (aparece la lista
+   de grupos del número conectado).
+5. Panel → **Probar el bot**: charlá. Después mandate un WhatsApp desde otro
+   teléfono. Si contesta, terminaste.
 
 ---
 
 ## Cosas que hay que saber
+
+### Lo que cuesta
+
+Railway cobra por uso; el plan Hobby incluye cinco dólares de uso por mes.
+
+| Servicio | Por mes, aproximado |
+|---|---|
+| Servidor del bot | 3 a 5 dólares |
+| Puente WAHA (corre un Chromium) | 5 a 8 dólares |
+| Volumen del puente | menos de 1 dólar |
+| Supabase | gratis para empezar |
+| Gemini | centavos por conversación |
+
+Contá **entre diez y quince dólares por mes por instalación** y decilo antes
+de vender, no después.
 
 ### Una sola réplica, siempre
 
@@ -47,29 +100,34 @@ manda los mensajes por una única cola, de a uno y con pausas, justamente para
 que WhatsApp no bloquee el número. Dos réplicas son dos colas mandando en
 paralelo: se pierde la protección entera y el número queda expuesto.
 
-Si algún día hace falta más capacidad, se resuelve moviendo la cola a la base,
-no agregando réplicas.
-
 ### El plan tiene que estar siempre encendido
 
 El bot espera antes de contestar, manda con pausas y corre crons. Nada de eso
-funciona en un servicio que se duerme ni en funciones serverless. Contá entre
-cinco y siete dólares por mes por instalación y decilo antes de vender, no
-después.
+funciona en un servicio que se duerme ni en funciones serverless.
+
+### Supabase gratis se pausa
+
+El plan gratuito de Supabase **pausa el proyecto después de una semana sin
+actividad**. Un bot con tráfico nunca llega a eso; una instalación de prueba
+sí. Se despierta desde el panel de Supabase. Y no tiene respaldos
+automáticos: eso es del plan Pro.
 
 ### Actualizar
 
-Cada push a `main` redespliega solo. Si algo sale mal, Railway guarda los
-despliegues anteriores y se vuelve atrás desde el panel de Deployments.
+Cada push a `main` redespliega solo. Si la actualización trae cambios en la
+base, el panel muestra una franja *"Hay cambios pendientes en la base de
+datos"* con el botón **Aplicar**: es el mismo paso de pegar un SQL en
+Supabase. Si algo sale mal, Railway guarda los despliegues anteriores y se
+vuelve atrás desde la pestaña Deployments.
 
 ### Respaldos
 
 Los datos están en Supabase, no en Railway: el servidor no guarda nada propio y
-se puede borrar y volver a crear sin perder una conversación. Los respaldos se
-configuran del lado de Supabase, y es responsabilidad de quien instala.
+se puede borrar y volver a crear sin perder una conversación. La sesión de
+WhatsApp vive en el volumen del puente.
 
 ### Registros
 
 Todo sale por la salida estándar y se ve en la pestaña Deployments de Railway.
-Si el servidor no arranca, ahí está el motivo: casi siempre es una variable que
-falta.
+Si el servidor no arranca, ahí está el motivo: casi siempre es una de las tres
+variables que falta.

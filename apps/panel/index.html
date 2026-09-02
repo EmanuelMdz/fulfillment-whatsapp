@@ -7,6 +7,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- La URL y la clave pública de Supabase las sirve el servidor en
+         tiempo de ejecución. Un script clásico corre antes que el módulo,
+         así window.__FW__ ya existe cuando arranca React. -->
+    <script src="/config.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

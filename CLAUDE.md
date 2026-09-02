@@ -57,7 +57,8 @@ edita una migración ya aplicada.** Toda tabla nueva arranca con RLS prendida y 
 política.
 
 ### 9. Antes de pushear
-`npm run build` tiene que pasar. Nunca pushear sin confirmación de Emanuel.
+`npm run check` (type-check + build) tiene que pasar. Nunca pushear sin
+confirmación de Emanuel.
 
 ### 10. Esto es material didáctico
 El comentario explica **por qué**, no qué. Si algo está resuelto de una forma
@@ -67,13 +68,22 @@ es media clase.
 Nombres de variables y de tablas en inglés; comentarios, interfaz y
 documentación en español.
 
+### 11. Todo se configura desde el panel
+Fuera del panel viven **tres variables**: `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+y `SUPABASE_SERVICE_ROLE_KEY`. Claves de IA, puente de WhatsApp, prompts,
+tiempos: todo va a `app_config` o `app_secrets` con su pantalla. Una variable
+de entorno nueva se justifica por escrito en `DECISIONES.md`. Las claves
+guardadas nunca vuelven enteras al navegador: solo si están cargadas y sus
+últimos caracteres (`config/settings.ts`).
+
 ## Dónde vive qué
 
 | Pieza | Lugar |
 |---|---|
-| Servidor, webhook, API, crons | `apps/bot/src/` |
+| Servidor, webhook, API, crons, instalador | `apps/bot/src/` |
+| Configuración leída de la base (antes el .env) | `apps/bot/src/config/settings.ts` |
 | Panel | `apps/panel/src/` |
-| Módulos y packs por defecto | `packages/core/src/index.js` |
+| Módulos, packs y catálogo de ejemplo | `packages/core/src/` |
 | Esquema | `packages/db/migrations/` |
 | Lo opcional | `modules/` |
 | Plan, porteo, decisiones, temario | `docs/` |
@@ -82,9 +92,9 @@ documentación en español.
 
 ```bash
 npm install
-npm run setup        # instalador
+npm run setup        # deja listo el .env local; la instalación la hace el panel
 npm run dev          # servidor
 npm run dev:panel    # panel con recarga en caliente
-npm run build        # OBLIGATORIO antes de pushear
-npm run type-check
+npm run check        # type-check + build — OBLIGATORIO antes de pushear
+npm run db:sql       # las migraciones para pegar en Supabase, por si no se usa el panel
 ```

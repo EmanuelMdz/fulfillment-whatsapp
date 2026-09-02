@@ -32,6 +32,8 @@ export interface QueuedSend {
 export interface HistoryMessage {
   author: 'customer' | 'bot' | 'human'
   body: string
+  /** 'image', 'audio', 'file'… cuando el mensaje trajo un archivo. */
+  media_kind?: string | null
 }
 
 /** Busca la conversación de este chat, o la crea junto con su contacto. */
@@ -93,6 +95,25 @@ export async function findMessageByExternalId(
     .maybeSingle()
   if (res.error) throw res.error
   return res.data as { id: string; author: string } | null
+}
+
+/**
+ * ¿Este texto lo mandamos nosotros a este chat hace un rato? Cubre la
+ * carrera del eco: el puente avisa "salió un mensaje tuyo" a veces ANTES
+ * de que la cola termine de guardarlo con su id. Sin esto, el bot toma su
+ * propio mensaje como una persona escribiendo desde el celular y se calla.
+ */
+export async function recentlySentByUs(chatId: string, body: string): Promise<boolean> {
+  const desde = new Date(Date.now() - 5 * 60_000).toISOString()
+  const res = await db()
+    .from('send_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('chat_id', chatId)
+    .eq('body', body)
+    .in('status', ['sending', 'sent'])
+    .gte('created_at', desde)
+  if (res.error) throw res.error
+  return (res.count ?? 0) > 0
 }
 
 export async function saveMessage(input: {
@@ -178,7 +199,7 @@ export async function lastInboundId(conversationId: string): Promise<string | nu
 export async function history(conversationId: string, limit = 20): Promise<HistoryMessage[]> {
   const res = await db()
     .from('messages')
-    .select('author, body')
+    .select('author, body, media_kind')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -231,25 +252,78 @@ export interface AppConfig {
   notify_chat_id: string | null
   /** Llave general: en false, el bot no contesta nada (los mensajes se guardan igual). */
   bot_enabled: boolean
+  // ── Lo que antes era el .env (0007). Se edita desde el panel. ──
+  llm_provider: string
+  llm_model: string
+  whatsapp_api_url: string
+  whatsapp_session: string
+  public_url: string
+  currency: string
+  debounce_seconds: number
+  send_pause_min_ms: number
+  send_pause_max_ms: number
+  quiet_hours_start: number
+  quiet_hours_end: number
+  // ── Instalación (0010) ──
+  install_token: string | null
+  installed_at: string | null
 }
 
-/** La fila única de configuración. Si falta (instalación a medias), valores vacíos. */
+/** Los valores de una instalación recién creada. También son el piso si una columna falta. */
+export const DEFAULT_CONFIG: AppConfig = {
+  pack: 'ecommerce',
+  business_name: '',
+  timezone: 'UTC',
+  labels: {},
+  order_stages: [],
+  escalation_reasons: [],
+  business_hours: {},
+  notify_chat_id: null,
+  bot_enabled: true,
+  llm_provider: 'gemini',
+  llm_model: 'gemini-2.5-flash',
+  whatsapp_api_url: '',
+  whatsapp_session: 'default',
+  public_url: '',
+  currency: '$',
+  debounce_seconds: 90,
+  send_pause_min_ms: 2000,
+  send_pause_max_ms: 6000,
+  quiet_hours_start: 23,
+  quiet_hours_end: 9,
+  install_token: null,
+  installed_at: null,
+}
+
+/** La fila única de configuración. Si falta (instalación a medias), valores por defecto. */
 export async function getConfig(): Promise<AppConfig> {
   const res = await db().from('app_config').select('*').eq('id', 1).maybeSingle()
   if (res.error) throw res.error
-  return (
-    (res.data as AppConfig) ?? {
-      pack: 'ecommerce',
-      business_name: '',
-      timezone: 'America/Montevideo',
-      labels: {},
-      order_stages: [],
-      escalation_reasons: [],
-      business_hours: {},
-      notify_chat_id: null,
-      bot_enabled: true,
-    }
-  )
+  return { ...DEFAULT_CONFIG, ...((res.data as Partial<AppConfig>) ?? {}) }
+}
+
+/** Columnas de app_config que el panel puede escribir a través del servidor. */
+export const EDITABLE_CONFIG_KEYS = [
+  'business_name',
+  'timezone',
+  'notify_chat_id',
+  'bot_enabled',
+  'llm_provider',
+  'llm_model',
+  'whatsapp_api_url',
+  'whatsapp_session',
+  'public_url',
+  'currency',
+  'debounce_seconds',
+  'send_pause_min_ms',
+  'send_pause_max_ms',
+  'quiet_hours_start',
+  'quiet_hours_end',
+] as const
+
+export async function updateConfig(patch: Partial<AppConfig>): Promise<void> {
+  const res = await db().from('app_config').update(patch).eq('id', 1)
+  if (res.error) throw res.error
 }
 
 /**
@@ -602,4 +676,64 @@ export async function claimDueTurns(max = 5): Promise<Conversation[]> {
   const res = await db().rpc('claim_due_turns', { max_batch: max })
   if (res.error) throw res.error
   return (res.data ?? []) as Conversation[]
+}
+
+// ── Equipo ───────────────────────────────────────────────────
+
+/** Quién puede entrar al panel. Ver 0008_equipo.sql. */
+export async function listTeamMembers(): Promise<Array<{ email: string; role: 'owner' | 'member' }>> {
+  const res = await db().from('team_members').select('email, role').order('created_at')
+  if (res.error) throw res.error
+  return (res.data ?? []) as Array<{ email: string; role: 'owner' | 'member' }>
+}
+
+export async function isTeamMember(email: string): Promise<boolean> {
+  const res = await db()
+    .from('team_members')
+    .select('email')
+    .eq('email', email.toLowerCase())
+    .maybeSingle()
+  if (res.error) throw res.error
+  return Boolean(res.data)
+}
+
+export async function addTeamMember(email: string, role: 'owner' | 'member'): Promise<void> {
+  const res = await db()
+    .from('team_members')
+    .upsert({ email: email.toLowerCase(), role }, { onConflict: 'email' })
+  if (res.error) throw res.error
+}
+
+export async function removeTeamMember(email: string): Promise<void> {
+  const res = await db().from('team_members').delete().eq('email', email.toLowerCase())
+  if (res.error) throw res.error
+}
+
+// ── Mantenimiento ────────────────────────────────────────────
+
+/** Al arrancar: las conversaciones cuyo turno murió con el proceso anterior. Ver 0009. */
+export async function recoverUnansweredTurns(): Promise<number> {
+  const res = await db().rpc('recover_unanswered_turns', { delay_seconds: 30 })
+  if (res.error) throw res.error
+  return Number(res.data ?? 0)
+}
+
+/** Borra los eventos de más de `days` días. Ver 0009. */
+export async function cleanupEventLog(days = 90): Promise<number> {
+  const res = await db().rpc('cleanup_event_log', { keep_days: days })
+  if (res.error) throw res.error
+  return Number(res.data ?? 0)
+}
+
+// ── Instalación ──────────────────────────────────────────────
+
+/**
+ * Las migraciones ya aplicadas, o null si la tabla no existe todavía
+ * (base recién creada). El asistente de instalación compara esto con los
+ * archivos del repo para saber qué SQL falta pegar.
+ */
+export async function appliedMigrations(): Promise<string[] | null> {
+  const res = await db().from('_migrations').select('name')
+  if (res.error) return null
+  return (res.data ?? []).map((r) => r.name as string)
 }

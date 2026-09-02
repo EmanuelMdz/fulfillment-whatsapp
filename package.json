@@ -1,7 +1,7 @@
 {
   "name": "fulfillment-whatsapp",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Atencion y ventas por WhatsApp con IA. Un repo, un deploy, modulos que se prenden y se apagan.",
   "type": "module",
   "workspaces": [
@@ -17,10 +17,8 @@
     "build": "npm run build --workspace=apps/panel && npm run build --workspace=apps/bot",
     "start": "npm run start --workspace=apps/bot",
     "setup": "node scripts/setup.mjs",
-    "type-check": "npm run type-check --workspace=apps/bot"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.112.4",
-    "pg": "^8.23.0"
+    "db:sql": "node scripts/db-sql.mjs",
+    "type-check": "npm run type-check --workspace=apps/bot",
+    "check": "npm run type-check && npm run build"
   }
 }

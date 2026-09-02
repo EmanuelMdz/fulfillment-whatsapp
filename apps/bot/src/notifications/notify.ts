@@ -1,4 +1,4 @@
-import { loadEnv } from '../config/env.js'
+import { getSettings } from '../config/settings.js'
 import { logEvent } from '../observability/events.js'
 import { claimNotificationEpisode, enqueueSend, getConfig } from '../db/queries.js'
 
@@ -53,13 +53,14 @@ export function sanitizeVar(input: string | null | undefined, maxLen = 120): str
 
 /**
  * Link a la conversación en el panel. WhatsApp solo hace clickeable lo
- * que empieza con http(s)://, así que sin PUBLIC_URL no se manda nada:
+ * que empieza con http(s)://, así que sin URL pública no se manda nada:
  * un path suelto en el grupo es un link roto que hay que copiar a mano.
+ * La URL la informa el hosting o se carga en Ajustes (ver settings.ts).
  */
-export function conversationLink(conversationId: string): string {
-  const base = loadEnv().publicUrl
+export async function conversationLink(conversationId: string): Promise<string> {
+  const base = (await getSettings()).publicUrl
   if (!base) return ''
-  return `${base}/conversaciones?id=${conversationId}`
+  return `${base}/?chat=${conversationId}`
 }
 
 export interface NoticeInput {
@@ -128,7 +129,7 @@ export async function notifyReview(params: {
   /** Derivada del mensaje que disparó la escalada: re-ejecutar no re-avisa. */
   episodeKey: string
 }): Promise<boolean> {
-  const link = conversationLink(params.conversationId)
+  const link = await conversationLink(params.conversationId)
   return sendGroupNotice({
     kind: 'revision',
     episodeKey: params.episodeKey,
@@ -155,7 +156,7 @@ export async function notifyOrderPending(params: {
   summary: string
   episodeKey: string
 }): Promise<boolean> {
-  const link = conversationLink(params.conversationId)
+  const link = await conversationLink(params.conversationId)
   return sendGroupNotice({
     kind: 'pedido_pendiente',
     episodeKey: params.episodeKey,
@@ -187,7 +188,7 @@ export async function notifyTurnFailed(params: {
   /** El id del mensaje que disparó el turno: la re-ejecución no re-avisa. */
   episodeKey: string
 }): Promise<boolean> {
-  const link = conversationLink(params.conversationId)
+  const link = await conversationLink(params.conversationId)
   return sendGroupNotice({
     kind: 'turno_caido',
     episodeKey: params.episodeKey,

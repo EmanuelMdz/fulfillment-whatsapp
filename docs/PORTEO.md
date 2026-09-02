@@ -69,6 +69,7 @@ base, sin una sola línea del negocio de origen.
 - [x] Catálogo en el panel (con `bot_info` como campo estrella — absorbe a `ProductBotTab`) + pestaña de pedidos con etapas del pack y "Abrir chat" (cierra el circuito del pedido del bot)
 - [x] `Metricas.jsx` → 7 números de los últimos 7 días, con "turnos caídos" en rojo si no está en cero
 - [x] **Nuevo**: instalador completo — corre las migraciones que falten (tabla `_migrations`, una transacción por archivo), escribe la config del pack desde `packages/core`, prende los módulos, siembra el catálogo de ejemplo y crea el usuario dueño. Re-ejecutable sin miedo.
+- [x] **Reemplazado (2026-09-01)**: el instalador pasó a ser una pantalla del panel (`routes/install.ts` + `pages/Instalar.jsx`): pegar el SQL en Supabase, pack, usuario. El script de terminal solo prepara el `.env` local. Con eso, la configuración entera (claves, puente, tiempos) se edita desde el panel y el entorno quedó en tres variables. Ver `AUDITORIA.md`.
 
 **Listo cuando** alguien que nunca vio el repo clona, corre el instalador,
 escanea el código y responde un mensaje desde el panel en menos de treinta

@@ -26,7 +26,7 @@ export default function Pedidos() {
         .select('*, contacts(name, phone)')
         .order('created_at', { ascending: false })
         .limit(200),
-      supabase.from('app_config').select('labels, order_stages').eq('id', 1).maybeSingle(),
+      supabase.from('app_config').select('labels, order_stages, currency').eq('id', 1).maybeSingle(),
     ])
     if (!pedidosRes.error) setPedidos(pedidosRes.data ?? [])
     if (!configRes.error) setConfig(configRes.data)
@@ -41,6 +41,7 @@ export default function Pedidos() {
   const etapas = config?.order_stages ?? []
   const finales = new Set(etapas.filter((e) => e.final).map((e) => e.key))
   const nombrePlural = config?.labels?.order_plural ?? 'Pedidos'
+  const moneda = config?.currency ?? '$'
   const visibles = soloAbiertos ? pedidos.filter((p) => !finales.has(p.stage)) : pedidos
 
   async function cambiarEtapa(pedido, stage) {
@@ -93,7 +94,7 @@ export default function Pedidos() {
                 {p.contacts?.name?.trim() || p.contacts?.phone || 'Sin contacto'}
                 {'  '}
                 <span className="muted" style={{ fontWeight: 400 }}>
-                  · ${p.total} · {new Date(p.created_at).toLocaleDateString('es-UY')}
+                  · {moneda}{p.total} · {new Date(p.created_at).toLocaleDateString('es-UY')}
                   {p.source === 'bot' ? ' · lo armó el bot' : ''}
                 </span>
               </div>

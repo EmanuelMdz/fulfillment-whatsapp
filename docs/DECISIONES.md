@@ -41,8 +41,9 @@ corriendo. Sin Docker, sin dominio que configurar. Render sirve igual, con la
 salvedad de que su plan gratuito duerme el servicio y un servicio dormido no
 manda seguimientos.
 
-**Lo que cuesta.** Entre cinco y siete dólares por mes por instalación. Va dicho
-en la página de venta, no se descubre en la clase cuatro.
+**Lo que cuesta.** Entre diez y quince dólares por mes por instalación (el
+servidor más el puente de WhatsApp). Va dicho en la página de venta, no se
+descubre en la clase cuatro.
 
 **Consecuencia que no se puede olvidar.** Una sola réplica. La protección contra
 el bloqueo del número depende de que exista una única cola de envío; dos
@@ -140,3 +141,44 @@ El test que lo resuelve: app creada, cuenta profesional como tester, webhook
 conectado, y **un DM desde un teléfono sin ningún rol en esa app**. Si dispara y
 la respuesta llega, el plan funciona. Si no, hay que ir por App Review y el
 producto cambia. Menos de una hora, y es el paso más barato de todo el proyecto.
+
+---
+
+## 9. Todo se configura desde el panel; fuera de él, tres variables
+
+**Decisión.** Las claves de IA, la dirección y la clave del puente de
+WhatsApp, los tiempos del bot y la ventana nocturna viven en la base
+(`app_config` y `app_secrets`) y se editan desde el panel. En el entorno
+quedan solo `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`:
+lo mínimo para que el proceso pueda leer el resto. La clave pública del
+panel también la sirve el servidor en tiempo de ejecución (`/config.js`), así
+un mismo build anda en cualquier instalación.
+
+**Por qué.** El producto lo instala gente que recién empieza. Cada valor en un
+archivo de texto o en la pantalla de variables del hosting es un lugar donde
+equivocarse y un reinicio por cada cambio. El panel ya tiene login y ya era
+el lugar de los prompts y las tres listas: era el lugar de todo.
+
+**Lo que cuesta.** El servidor lee la configuración de la base con una caché
+corta, y las claves necesitan una tabla sin política de lectura para el
+navegador. Y una consecuencia de seguridad que había que resolver de paso: si
+todo se edita desde el panel, quién entra al panel importa más — de ahí
+`team_members` (0008) y el asistente de instalación con su código (0010).
+
+---
+
+## 10. La instalación es una pantalla, no un script
+
+**Decisión.** Al abrir el panel contra una base vacía aparece un asistente:
+pegar un SQL en Supabase, elegir el pack, crear el usuario. El script de
+terminal quedó solo para preparar el `.env` local.
+
+**Por qué.** El instalador anterior pedía la URI de Postgres con la
+contraseña de la base, que nadie tiene a mano. El servidor con la clave de
+servicio puede hacer todo lo demás; lo único que no puede es crear tablas, y
+para eso alcanza con un paste en el editor SQL. Un solo paso difícil en vez
+de tres.
+
+**Lo que cuesta.** Las rutas del asistente son públicas (no hay usuario
+todavía) y se protegen con un código que viaja dentro del SQL: quien lo pegó
+en esa base es quien puede terminar la instalación.

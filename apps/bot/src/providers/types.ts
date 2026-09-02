@@ -38,8 +38,8 @@ export interface InboundMessage {
 
 export interface MessageProvider {
   readonly channel: Channel
-  /** ¿Está configurado y listo para usar? */
-  isReady(): boolean
+  /** ¿Está configurado y listo para usar? (Lee la configuración del panel.) */
+  isReady(): Promise<boolean>
   sendText(chatId: string, text: string): Promise<{ externalId: string | null }>
   startTyping(chatId: string): Promise<void>
   stopTyping(chatId: string): Promise<void>

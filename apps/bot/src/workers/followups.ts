@@ -1,9 +1,10 @@
-import { loadEnv } from '../config/env.js'
+import { getSettings, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { isNightAt } from '../agents/followup.js'
 import {
   claimDueFollowups,
+  cleanupEventLog,
   enqueueSend,
   getConfig,
   getConversationById,
@@ -18,6 +19,9 @@ import {
  * No manda nada él mismo — el ritmo y la protección del número son de la
  * cola (workers/send-queue.ts). Este solo decide QUÉ recordatorio sale y
  * cuál ya no tiene sentido mandar.
+ *
+ * De paso, una vez por día, limpia el registro de eventos viejo: es el
+ * único trabajador que corre cada minuto y no cada segundos.
  */
 
 // Un recordatorio con más de un día de atraso (el servidor estuvo caído,
@@ -25,7 +29,11 @@ import {
 // fuera de contexto. Mejor no mandarlo.
 const OVERDUE_MS = 24 * 60 * 60 * 1000
 
+const LIMPIEZA_CADA_MS = 24 * 60 * 60 * 1000
+const EVENTOS_DIAS = 90
+
 let corriendo = false
+let ultimaLimpieza = 0
 
 async function despachar(fu: Followup): Promise<void> {
   if (Date.now() - new Date(fu.scheduled_at).getTime() > OVERDUE_MS) {
@@ -61,17 +69,30 @@ async function despachar(fu: Followup): Promise<void> {
   logEvent({ eventType: 'followup.sent', conversationId: fu.conversation_id })
 }
 
+async function limpiarEventos(): Promise<void> {
+  if (Date.now() - ultimaLimpieza < LIMPIEZA_CADA_MS) return
+  ultimaLimpieza = Date.now()
+  try {
+    const borrados = await cleanupEventLog(EVENTOS_DIAS)
+    if (borrados) console.log(`[eventos] ${borrados} evento(s) de más de ${EVENTOS_DIAS} días borrados`)
+  } catch (error) {
+    console.warn('[eventos] no se pudo limpiar el registro:', describe(error))
+  }
+}
+
 async function tick(): Promise<void> {
   if (corriendo) return
   corriendo = true
 
   try {
-    const config = await getConfig()
+    await limpiarEventos()
+
+    const [config, s] = await Promise.all([getConfig(), getSettings()])
     // Con el bot apagado no sale nada; y de noche tampoco, sin importar
     // para cuándo estaba agendado — el bloqueo horario es duro. Los
     // pendientes quedan y salen a la mañana.
     if (!config.bot_enabled) return
-    if (isNightAt(new Date(), config.timezone)) return
+    if (isNightAt(new Date(), config.timezone, s.bot.quietHoursStart, s.bot.quietHoursEnd)) return
 
     const vencidos = await claimDueFollowups(5)
     for (const fu of vencidos) {
@@ -90,9 +111,8 @@ async function tick(): Promise<void> {
 }
 
 export function startFollowups(): void {
-  const env = loadEnv()
   setInterval(() => {
     void tick()
-  }, env.bot.followupTickMs)
-  console.log(`[seguimiento] activo, revisando cada ${env.bot.followupTickMs / 1000}s`)
+  }, TICK_MS.followup)
+  console.log(`[seguimiento] activo, revisando cada ${TICK_MS.followup / 1000}s`)
 }

@@ -19,6 +19,14 @@ Hay cambios sin commitear (Tanda 3: módulos, menú dinámico, Ajustes, carga
 del `.env`, arreglo de la migración 0001) — se commitean antes de tocar nada
 de esto.
 
+> **Actualización, 1 de setiembre de 2026 (mismo día):** las cuatro tandas
+> del punto 7 quedaron implementadas (migraciones 0007 a 0010,
+> `config/settings.ts`, asistente de instalación, pantallas de claves,
+> usuarios, grupo de avisos, prueba de contexto y seguimientos, y las
+> catorce fallas del punto 4). Lo que sigue abajo es el diagnóstico tal como
+> se escribió; sirve para entender el porqué de cada cambio. Lo único que
+> queda por verificar con un número conectado es la 4.2 (la carrera del eco).
+
 ---
 
 ## 0. Resumen ejecutivo

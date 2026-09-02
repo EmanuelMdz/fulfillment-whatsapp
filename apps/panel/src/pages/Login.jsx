@@ -17,8 +17,8 @@ export default function Login() {
         <div className="card login-card">
           <h1>Panel</h1>
           <p className="error-text">
-            Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el .env.
-            Completalas y volvé a compilar (npm run build).
+            El servidor no informó la conexión a Supabase. Revisá que SUPABASE_URL y
+            SUPABASE_ANON_KEY estén cargadas en el hosting (o en el .env) y recargá.
           </p>
         </div>
       </div>

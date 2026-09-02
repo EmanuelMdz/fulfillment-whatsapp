@@ -1,4 +1,4 @@
-import { loadEnv, hasLlm } from '../config/env.js'
+import { getSettings, hasLlm, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { notifyOrderPending, notifyReview, notifyTurnFailed } from '../notifications/notify.js'
@@ -12,6 +12,7 @@ import {
   claimDueTurns,
   enqueueSend,
   getConfig,
+  getPrompts,
   history,
   lastInboundId,
   lastInboundPreview,
@@ -19,6 +20,7 @@ import {
   pauseForHuman,
   queueReview,
   type Conversation,
+  type HistoryMessage,
 } from '../db/queries.js'
 
 /**
@@ -33,7 +35,8 @@ import {
  * La diferencia aparece el día que el servidor se reinicia justo después
  * de un despliegue: con un temporizador en memoria, esas conversaciones
  * quedaban sin respuesta y nadie se enteraba. Así, siguen agendadas y se
- * contestan igual.
+ * contestan igual. (Y el turno que estaba corriendo cuando murió el
+ * proceso se recupera al arrancar: ver recover_unanswered_turns en 0009.)
  * ────────────────────────────────────────────────────────────
  *
  * El turno no es solo "preguntarle al modelo": es una fila de guardas
@@ -44,8 +47,25 @@ import {
 
 let corriendo = false
 let avisoApagado = false
+let avisoSinClave = false
 
-const LINEA_PUENTE = 'Dame un momentito que lo reviso y te escribo 🙌'
+// Piso por si el prompt se borró desde el panel. Los textos de verdad
+// viven en la tabla `prompts` (secciones mensaje_puente y
+// mensaje_pedido_anotado) y se editan desde Studio.
+const PUENTE_POR_DEFECTO = 'Dame un momentito que lo reviso y te escribo 🙌'
+const PEDIDO_ANOTADO_POR_DEFECTO = 'Dale! Ya quedó anotado, apenas el equipo lo confirme te aviso por acá 🙌'
+
+/**
+ * Lo que el modelo lee por cada mensaje del hilo. Un mensaje sin texto
+ * (una foto, un audio) no puede ir vacío: Gemini rechaza el pedido
+ * entero. Con los módulos de imágenes y audios apagados, lo mínimo es
+ * que el modelo sepa que llegó un archivo.
+ */
+export function turnContent(m: HistoryMessage): string {
+  if (m.body.trim()) return m.body
+  if (m.media_kind) return `(el cliente mandó un archivo: ${m.media_kind})`
+  return '(mensaje sin texto)'
+}
 
 /**
  * La conversación pasa a manos del equipo: el bot se calla, queda un caso
@@ -134,7 +154,7 @@ async function responder(conversacion: Conversation): Promise<void> {
   const { system, config } = await buildTurnContext(conversacion.channel)
   const turnos: Turn[] = historial.map((m) => ({
     role: m.author === 'customer' ? 'user' : 'assistant',
-    content: m.body,
+    content: turnContent(m),
   }))
 
   const crudo = await chat(system, turnos)
@@ -147,11 +167,12 @@ async function responder(conversacion: Conversation): Promise<void> {
   // puente — y el chat a revisión para que lo levante una persona.
   if (!decision.messages.length) {
     console.warn(`[turno] el modelo no devolvió nada para ${conversacion.chat_id}`)
+    const prompts = await getPrompts(conversacion.channel)
     await enqueueSend({
       conversationId: conversacion.id,
       channel: conversacion.channel,
       chatId: conversacion.chat_id,
-      body: LINEA_PUENTE,
+      body: prompts.mensaje_puente?.trim() || PUENTE_POR_DEFECTO,
     })
     await escalar(
       conversacion,
@@ -214,11 +235,12 @@ async function responder(conversacion: Conversation): Promise<void> {
       const resultado = await createOrderFromChat(conversacion, decision.order, config)
       // Sin promesa de tiempo a propósito: "en un ratito" con una
       // aprobación que tarda horas es un cliente reclamando a las 18hs.
+      const prompts = await getPrompts(conversacion.channel)
       await enqueueSend({
         conversationId: conversacion.id,
         channel: conversacion.channel,
         chatId: conversacion.chat_id,
-        body: 'Dale! Ya quedó anotado, apenas el equipo lo confirme te aviso por acá 🙌',
+        body: prompts.mensaje_pedido_anotado?.trim() || PEDIDO_ANOTADO_POR_DEFECTO,
       })
       await pauseForHuman(conversacion.id)
       await cancelPendingFollowups(conversacion.id)
@@ -317,6 +339,19 @@ async function tick(): Promise<void> {
       avisoApagado = false
     }
 
+    // Sin clave del modelo, lo mismo: los turnos ESPERAN. Reclamarlos
+    // para que fallen sería un aviso de "el bot no pudo contestar" al
+    // grupo por cada mensaje, antes de que el dueño termine de instalar.
+    const s = await getSettings()
+    if (!hasLlm(s)) {
+      if (!avisoSinClave) {
+        console.log('[turno] sin clave del modelo — los turnos esperan (panel → Studio)')
+        avisoSinClave = true
+      }
+      return
+    }
+    avisoSinClave = false
+
     const vencidas = await claimDueTurns(5)
     for (const conversacion of vencidas) {
       try {
@@ -357,14 +392,8 @@ async function tick(): Promise<void> {
 }
 
 export function startTurns(): void {
-  const env = loadEnv()
-  if (!hasLlm(env)) {
-    console.log('[turno] sin clave del modelo — el bot no va a contestar')
-  }
   setInterval(() => {
     void tick()
-  }, env.bot.turnTickMs)
-  console.log(
-    `[turno] activo, revisando cada ${env.bot.turnTickMs / 1000}s · espera de ${env.bot.debounceSeconds}s antes de contestar`,
-  )
+  }, TICK_MS.turn)
+  console.log(`[turno] activo, revisando cada ${TICK_MS.turn / 1000}s`)
 }

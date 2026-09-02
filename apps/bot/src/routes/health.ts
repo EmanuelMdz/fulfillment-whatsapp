@@ -1,18 +1,31 @@
 import { Hono } from 'hono'
-import { loadEnv, hasWhatsapp } from '../config/env.js'
+import { getSettings, hasLlm, hasWhatsapp } from '../config/settings.js'
+import { describe } from '../utils/errors.js'
 
 /**
- * Chequeo de salud. Lo usa el hosting para saber si el proceso está vivo
- * y el instalador para confirmar que quedó bien configurado.
+ * Chequeo de salud. Lo usa el hosting para saber si el proceso está vivo,
+ * y el panel para mostrar la franja de "falta configurar tal cosa".
+ *
+ * Responde ok:true aunque la base no conteste o no esté instalada: el
+ * proceso ESTÁ vivo, y si el hosting lo reiniciara por esto, el asistente
+ * de instalación nunca llegaría a abrirse.
  */
 export const healthRoute = new Hono()
 
-healthRoute.get('/', (c) => {
-  const env = loadEnv()
-  return c.json({
-    ok: true,
-    version: '0.1.0',
-    timezone: env.timezone,
-    whatsapp: hasWhatsapp(env) ? 'configurado' : 'sin configurar',
-  })
+const VERSION = '0.2.0'
+
+healthRoute.get('/', async (c) => {
+  try {
+    const s = await getSettings()
+    return c.json({
+      ok: true,
+      version: VERSION,
+      timezone: s.config.timezone,
+      whatsapp: hasWhatsapp(s) ? 'configurado' : 'sin configurar',
+      llm: hasLlm(s) ? 'configurado' : 'sin clave',
+      public_url: s.publicUrl || null,
+    })
+  } catch (err) {
+    return c.json({ ok: true, version: VERSION, db: `sin instalar o sin conexión: ${describe(err)}` })
+  }
 })
