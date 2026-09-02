@@ -14,17 +14,20 @@ export { SEEDS } from './seeds.js'
  *
  * `available: false` marca los que todavía no tienen código: el panel los
  * muestra como "próximamente" y no deja prenderlos. Un interruptor que
- * no hace nada es peor que no tenerlo.
+ * no hace nada es peor que no tenerlo. Cada módulo pasa a `true` el día
+ * que su código entra (Tanda 3 en docs/PORTEO.md). La bandera en la
+ * tabla `modules` se siembra igual según el pack: cuando el código
+ * llegue, el módulo ya va a estar prendido donde corresponde.
  */
 export const MODULES = [
-  { key: 'stock', label: 'Inventario', description: 'existencias y aviso de faltante', available: true },
-  { key: 'payments', label: 'Cobros', description: 'link de pago', available: true },
-  { key: 'vision', label: 'Imágenes', description: 'leer fotos y comprobantes', available: true },
-  { key: 'audio', label: 'Audios', description: 'transcribir notas de voz', available: true },
+  { key: 'stock', label: 'Inventario', description: 'existencias y aviso de faltante', available: false },
+  { key: 'payments', label: 'Cobros', description: 'link de pago', available: false },
+  { key: 'vision', label: 'Imágenes', description: 'leer fotos y comprobantes', available: false },
+  { key: 'audio', label: 'Audios', description: 'transcribir notas de voz', available: false },
   { key: 'shipping', label: 'Envíos', description: 'conector propio, por defecto no hace nada', available: false },
   { key: 'ads', label: 'Anuncios', description: 'de qué aviso vino el chat', available: false },
-  { key: 'hours', label: 'Horarios', description: 'atención por franja', available: true },
-  { key: 'team', label: 'Equipo', description: 'asignar casos a personas', available: true },
+  { key: 'hours', label: 'Horarios', description: 'atención por franja', available: false },
+  { key: 'team', label: 'Equipo', description: 'asignar casos a personas', available: false },
 ]
 
 /** Lo que siempre está, en cualquier instalación. Se lista para el panel. */

@@ -16,6 +16,7 @@ import { parseTurnDecision } from '../agents/decision.js'
 import { decideFollowups } from '../agents/followup.js'
 import { chat, type Turn } from '../agents/llm.js'
 import { db } from '../db/client.js'
+import { applyPendingMigrations, canAutoMigrate } from '../db/migrate.js'
 import type { PanelEnv } from '../middleware/auth.js'
 import {
   EDITABLE_CONFIG_KEYS,
@@ -419,6 +420,21 @@ panelRoute.post('/settings', async (c) => {
 panelRoute.post('/settings/reload', (c) => {
   forgetSettings()
   return c.json({ ok: true })
+})
+
+// Una actualización trajo migraciones nuevas: con el token de acceso, el
+// servidor las aplica acá mismo (el botón "Aplicar" de la franja).
+panelRoute.post('/migrate', async (c) => {
+  if (!canAutoMigrate()) {
+    return c.json({ error: 'Sin SUPABASE_ACCESS_TOKEN el servidor no puede crear tablas: pegá el SQL' }, 400)
+  }
+  try {
+    const aplicadas = await applyPendingMigrations()
+    forgetSettings()
+    return c.json({ ok: true, aplicadas })
+  } catch (err) {
+    return c.json({ error: describe(err) }, 502)
+  }
 })
 
 // ── Usuarios ─────────────────────────────────────────────────

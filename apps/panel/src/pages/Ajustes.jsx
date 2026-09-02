@@ -179,7 +179,8 @@ export default function Ajustes() {
         <h2>Módulos</h2>
         <p className="muted">
           Un módulo apagado no corre, no aparece en el menú y no pide claves. Prenderlo y
-          apagarlo es seguro: no se pierde nada de lo que ya está cargado.
+          apagarlo es seguro: no se pierde nada de lo que ya está cargado. Los que dicen
+          "próximamente" todavía no tienen código: se habilitan a medida que llegan.
         </p>
         <div className="modulos">
           {MODULES.map((m) => (

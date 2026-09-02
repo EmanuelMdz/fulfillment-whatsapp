@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
+import { api } from '../lib/api.js'
 
 /**
- * El asistente de instalación. Tres pasos, sin terminal:
+ * El asistente de instalación. Sin terminal.
  *
- *   1. Pegar un SQL en Supabase (crea las tablas). El servidor sabe qué
- *      falta leyendo la tabla _migrations, así que el mismo paso sirve
- *      después para las actualizaciones.
- *   2. El negocio: pack, nombre, zona horaria, moneda, catálogo de ejemplo.
- *   3. El usuario dueño.
+ * Con el token de acceso de Supabase cargado en el hosting (lo normal),
+ * las tablas se crearon solas al arrancar el servidor y acá quedan dos
+ * pasos: el negocio y el usuario. La prueba de que quien instala es el
+ * dueño son los últimos caracteres de ese token, que él mismo cargó.
  *
- * El SQL trae un código de instalación al azar que queda guardado en la
- * base; el paso 3 lo manda de vuelta. Así el servidor sabe que quien
- * termina la instalación es quien tiene acceso a esa base — y no alguien
- * que encontró la URL antes que el dueño.
+ * Sin token, aparece un paso más: copiar un SQL y pegarlo en el editor
+ * de Supabase. Ese SQL trae un código de instalación al azar que queda
+ * guardado en la base; el último paso lo manda de vuelta. Así nadie que
+ * encuentre la URL antes que el dueño puede quedarse con el panel.
  *
  * `onListo` lo pasa RequireAuth cuando se usa antes del login. Desde el
- * menú (ya instalado) no viene, y la pantalla solo muestra el paso 1.
+ * menú (ya instalado) no viene, y la pantalla solo aplica las
+ * actualizaciones de la base.
  */
 
 const ZONAS = (() => {
@@ -36,15 +37,16 @@ function zonaDelNavegador() {
 }
 
 const PACKS = [
-  { key: 'ecommerce', nombre: 'Ecommerce', detalle: 'Clientes, productos, ventas. Inventario y cobros prendidos.' },
-  { key: 'servicios', nombre: 'Servicios', detalle: 'Pacientes, prestaciones, consultas. Horarios y equipo prendidos.' },
+  { key: 'ecommerce', nombre: 'Ecommerce', detalle: 'Clientes, productos, ventas. Para vender cosas.' },
+  { key: 'servicios', nombre: 'Servicios', detalle: 'Pacientes, prestaciones, consultas. Para agendar turnos.' },
 ]
 
 export default function Instalar({ onListo }) {
-  const [estado, setEstado] = useState(null) // { dbReady, pending, installed, detail }
-  const [sql, setSql] = useState(null) // { sql, token }
+  const [estado, setEstado] = useState(null) // { dbReady, pending, installed, auto, detail }
+  const [sql, setSql] = useState(null) // { sql, token } — solo sin token de acceso
   const [copiado, setCopiado] = useState(false)
   const [verificando, setVerificando] = useState(false)
+  const [migrando, setMigrando] = useState(false)
   const [form, setForm] = useState({
     pack: 'ecommerce',
     businessName: '',
@@ -53,10 +55,12 @@ export default function Instalar({ onListo }) {
     seedDemo: true,
     ownerEmail: '',
     ownerPassword: '',
+    tokenTail: '',
   })
   const [error, setError] = useState(null)
   const [trabajando, setTrabajando] = useState(false)
   const [listo, setListo] = useState(false)
+  const migracionAutomaticaIntentada = useRef(false)
 
   const consultar = useCallback(async () => {
     const r = await fetch('/api/install/status')
@@ -70,13 +74,43 @@ export default function Instalar({ onListo }) {
     setSql(await r.json())
   }, [])
 
+  // Con token: aplica lo pendiente. Antes del login va por la ruta pública
+  // del asistente; ya adentro, por la del panel (con sesión).
+  const migrar = useCallback(async () => {
+    setMigrando(true)
+    setError(null)
+    try {
+      if (onListo) {
+        const r = await fetch('/api/install/migrate', { method: 'POST' })
+        const j = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(j.error || `El servidor respondió ${r.status}`)
+      } else {
+        await api('/migrate', {})
+      }
+      await consultar()
+    } catch (err) {
+      setError(`No se pudieron crear las tablas: ${err.message}`)
+    } finally {
+      setMigrando(false)
+    }
+  }, [consultar, onListo])
+
   useEffect(() => {
     consultar()
       .then((st) => {
-        if (st.pending?.length || !st.installed) pedirSql()
+        if (st.auto) {
+          // El servidor ya lo intentó al arrancar; si quedó algo (por
+          // ejemplo, la base tardó en despertarse), se reintenta una vez.
+          if (st.pending?.length && !migracionAutomaticaIntentada.current) {
+            migracionAutomaticaIntentada.current = true
+            migrar()
+          }
+        } else if (st.pending?.length || !st.installed) {
+          pedirSql()
+        }
       })
       .catch(() => setError('No se pudo hablar con el servidor.'))
-  }, [consultar, pedirSql])
+  }, [consultar, pedirSql, migrar])
 
   async function copiar() {
     try {
@@ -123,9 +157,12 @@ export default function Instalar({ onListo }) {
     }
   }
 
+  const auto = Boolean(estado?.auto)
   const pendientes = estado?.pending?.length ?? 0
   const paso = !estado ? 0 : pendientes ? 1 : !estado.installed ? 2 : 3
   const zonas = ZONAS.includes(form.timezone) ? ZONAS : [form.timezone, ...ZONAS]
+  // Sin token hace falta el código del SQL para terminar; con token, no.
+  const puedeTerminar = auto ? form.tokenTail.trim().length >= 8 : Boolean(sql?.token)
 
   return (
     <div className="instalar-wrap">
@@ -133,7 +170,7 @@ export default function Instalar({ onListo }) {
         <h1>Instalación</h1>
         <p className="muted" style={{ marginTop: 0 }}>
           {onListo
-            ? 'Tres pasos y el panel queda listo. No hace falta abrir una terminal.'
+            ? 'Un par de pasos y el panel queda listo. No hace falta abrir una terminal.'
             : 'Cambios pendientes en la base de datos.'}
         </p>
 
@@ -147,10 +184,30 @@ export default function Instalar({ onListo }) {
         {estado?.detail && <p className="error-text">{estado.detail}</p>}
         {!estado && <p className="muted">Consultando…</p>}
 
-        {/* ── Paso 1: el SQL ─────────────────────────────────── */}
-        {estado && (pendientes > 0 || (!estado.installed && !listo)) && (
+        {/* ── Paso 1 (con token): la base se prepara sola ─────── */}
+        {estado && auto && pendientes > 0 && (
+          <div className="card">
+            <h2>Preparar la base de datos</h2>
+            <p className="muted">
+              El servidor tiene el token de acceso de Supabase: crea las tablas solo.
+              {migrando ? ' Creando…' : ` Faltan: ${estado.pending.join(', ')}`}
+            </p>
+            <div className="acciones-inline">
+              <button className="btn primary" onClick={migrar} disabled={migrando}>
+                <RefreshCw size={15} /> {migrando ? 'Creando las tablas…' : 'Crear las tablas ahora'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Paso 1 (sin token): el SQL para pegar ──────────── */}
+        {estado && !auto && (pendientes > 0 || (!estado.installed && !listo)) && (
           <div className="card">
             <h2>{pendientes ? 'Preparar la base de datos' : 'Confirmar el acceso a la base'}</h2>
+            <p className="muted">
+              El servidor no tiene el token de acceso de Supabase, así que las tablas las creás vos
+              con un paste. (Si cargás SUPABASE_ACCESS_TOKEN en el hosting, este paso desaparece.)
+            </p>
             <ol className="steps">
               <li>Copiá todo el texto de abajo.</li>
               <li>En Supabase: menú <strong>SQL Editor</strong> → New query → pegalo → <strong>Run</strong>.</li>
@@ -164,11 +221,7 @@ export default function Instalar({ onListo }) {
               <button className="btn" onClick={verificar} disabled={verificando}>
                 <RefreshCw size={15} /> {verificando ? 'Verificando…' : 'Verificar'}
               </button>
-              {pendientes > 0 && (
-                <span className="muted">
-                  Faltan: {estado.pending.join(', ')}
-                </span>
-              )}
+              {pendientes > 0 && <span className="muted">Faltan: {estado.pending.join(', ')}</span>}
             </div>
           </div>
         )}
@@ -250,10 +303,28 @@ export default function Instalar({ onListo }) {
                 />
               </label>
             </div>
-            <button className="btn primary" type="submit" disabled={trabajando || !sql?.token}>
+
+            {auto && (
+              <label className="field">
+                <span>
+                  Para confirmar que sos vos: los <strong>últimos 8 caracteres</strong> del token de
+                  acceso (SUPABASE_ACCESS_TOKEN) que cargaste en el hosting
+                </span>
+                <input
+                  value={form.tokenTail}
+                  onChange={(e) => setForm({ ...form, tokenTail: e.target.value })}
+                  autoComplete="off"
+                  maxLength={8}
+                  required
+                  style={{ maxWidth: 200 }}
+                />
+              </label>
+            )}
+
+            <button className="btn primary" type="submit" disabled={trabajando || !puedeTerminar}>
               {trabajando ? 'Instalando…' : 'Terminar la instalación'}
             </button>
-            {!sql?.token && (
+            {!auto && !sql?.token && (
               <p className="muted" style={{ marginTop: 8 }}>
                 Falta el código de instalación: recargá la página y pegá el SQL de nuevo.
               </p>

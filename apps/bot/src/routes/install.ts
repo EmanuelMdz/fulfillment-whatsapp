@@ -1,11 +1,10 @@
 import { Hono } from 'hono'
 import { randomBytes } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { MODULES, PACKS, SEEDS, modulesForPack } from '@fw/core'
+import { loadEnv } from '../config/env.js'
 import { forgetSettings } from '../config/settings.js'
 import { db } from '../db/client.js'
+import { applyPendingMigrations, canAutoMigrate, closeSignups, pendingMigrations, sqlBundle } from '../db/migrate.js'
 import { addTeamMember, appliedMigrations, getConfig, updateConfig } from '../db/queries.js'
 import { describe } from '../utils/errors.js'
 
@@ -13,38 +12,25 @@ import { describe } from '../utils/errors.js'
  * El asistente de instalación.
  *
  * Objetivo: que alguien que nunca vio el repo pase de "desplegué en
- * Railway" a "el bot me contesta" sin abrir una terminal. El servidor,
- * con la clave de servicio, puede hacer casi todo: escribir la
- * configuración del pack, sembrar el catálogo, crear el usuario dueño.
- * Lo ÚNICO que no puede hacer por la API de Supabase es crear tablas.
- * Para eso el panel le muestra al dueño el SQL y él lo pega en el editor
- * de Supabase: un solo paste.
+ * Railway" a "el bot me contesta" sin abrir una terminal.
+ *
+ * Con el token de acceso (lo normal), las tablas ya se crearon al
+ * arrancar el servidor (ver index.ts) y acá solo queda el negocio y el
+ * usuario. Sin token, el panel muestra el SQL y el dueño lo pega en el
+ * editor de Supabase: un solo paste.
  *
  * Estas rutas son públicas (todavía no hay usuario), así que se
  * protegen solas:
  *   - /status y /sql no revelan nada que no esté en el repo.
- *   - /finish exige dos cosas: que NO haya usuarios todavía, y el token
- *     que viajó adentro del SQL. Quien no pegó ese SQL en esa base no
- *     tiene el token — y eso prueba que es el dueño de la base.
+ *   - /finish exige que NO haya usuarios todavía, y una prueba de que
+ *     quien instala es el dueño: con token, los últimos caracteres del
+ *     token (que él cargó en el hosting); sin token, el código que viajó
+ *     adentro del SQL que pegó en su base.
  *
- * Después de instalado, /sql sigue sirviendo para las actualizaciones:
- * cuando un push trae una migración nueva, el panel avisa y da el SQL.
+ * Después de instalado, /sql y /migrate siguen sirviendo para las
+ * actualizaciones (con sesión, desde /api/panel/migrate).
  */
 export const installRoute = new Hono()
-
-// apps/bot/src/routes → la raíz del repo está cuatro niveles arriba. En
-// dist/routes es la misma distancia.
-const MIGRATIONS_DIR = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..', '..', '..', '..',
-  'packages', 'db', 'migrations',
-)
-
-function migrationFiles(): string[] {
-  return readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith('.sql'))
-    .sort()
-}
 
 async function hayUsuarios(): Promise<boolean> {
   const { data, error } = await db().auth.admin.listUsers({ page: 1, perPage: 1 })
@@ -52,10 +38,14 @@ async function hayUsuarios(): Promise<boolean> {
   return (data?.users?.length ?? 0) > 0
 }
 
-async function estado(): Promise<{ dbReady: boolean; pending: string[]; installed: boolean; detail?: string }> {
-  const aplicadas = await appliedMigrations()
-  const archivos = migrationFiles()
-  const pending = aplicadas === null ? archivos : archivos.filter((f) => !aplicadas.includes(f))
+export async function installStatus(): Promise<{
+  dbReady: boolean
+  pending: string[]
+  installed: boolean
+  auto: boolean
+  detail?: string
+}> {
+  const { dbReady, pending } = await pendingMigrations()
   let installed = false
   let detail: string | undefined
   try {
@@ -63,32 +53,44 @@ async function estado(): Promise<{ dbReady: boolean; pending: string[]; installe
   } catch (err) {
     detail = `No se pudo consultar Supabase Auth: ${describe(err)}`
   }
-  return { dbReady: aplicadas !== null, pending, installed, detail }
+  return { dbReady, pending, installed, auto: canAutoMigrate(), detail }
 }
 
-installRoute.get('/status', async (c) => c.json(await estado()))
+installRoute.get('/status', async (c) => c.json(await installStatus()))
 
 installRoute.get('/sql', async (c) => {
-  const st = await estado()
-  const partes: string[] = [
-    '-- Fulfillment WhatsApp — pegá TODO esto en Supabase → SQL Editor → Run.',
-    '-- Se puede pegar más de una vez sin romper nada.',
-    'create table if not exists public._migrations (name text primary key, applied_at timestamptz not null default now());',
-  ]
-  for (const file of st.pending) {
-    partes.push(`-- >>> ${file}`)
-    partes.push(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'))
-    partes.push(`insert into public._migrations (name) values ('${file}') on conflict do nothing;`)
-  }
-
+  const st = await installStatus()
+  let sql = sqlBundle(st.pending)
   let token: string | null = null
   if (!st.installed) {
     token = randomBytes(16).toString('hex')
-    partes.push('-- Prueba de que quien instala tiene acceso a esta base (se borra al terminar).')
-    partes.push(`update public.app_config set install_token = '${token}' where id = 1;`)
+    sql += [
+      '',
+      '',
+      '-- Prueba de que quien instala tiene acceso a esta base (se borra al terminar).',
+      `update public.app_config set install_token = '${token}' where id = 1;`,
+      '',
+    ].join('\n')
   }
+  return c.json({ sql, token, pending: st.pending, installed: st.installed })
+})
 
-  return c.json({ sql: partes.join('\n\n') + '\n', token, pending: st.pending, installed: st.installed })
+// Con token de acceso: aplica lo pendiente ahora. Antes de instalar es
+// público (no hay usuario); después, la misma acción vive en
+// /api/panel/migrate, con sesión.
+installRoute.post('/migrate', async (c) => {
+  if (!canAutoMigrate()) {
+    return c.json({ error: 'Sin SUPABASE_ACCESS_TOKEN el servidor no puede crear tablas: pegá el SQL' }, 400)
+  }
+  if (await hayUsuarios().catch(() => false)) {
+    return c.json({ error: 'Ya instalado: aplicá las actualizaciones desde el panel' }, 409)
+  }
+  try {
+    const aplicadas = await applyPendingMigrations()
+    return c.json({ ok: true, aplicadas })
+  } catch (err) {
+    return c.json({ error: describe(err) }, 502)
+  }
 })
 
 installRoute.post('/finish', async (c) => {
@@ -99,21 +101,33 @@ installRoute.post('/finish', async (c) => {
     return c.json({ error: 'JSON inválido' }, 400)
   }
 
-  const st = await estado()
+  const st = await installStatus()
   if (st.pending.length) {
-    return c.json({ error: 'Todavía faltan migraciones: pegá el SQL en Supabase y verificá de nuevo' }, 409)
+    return c.json({ error: 'Todavía faltan migraciones. Verificá la base de nuevo.' }, 409)
   }
   if (st.installed) {
     return c.json({ error: 'Esta instalación ya tiene usuarios. Entrá con el tuyo.' }, 409)
   }
 
-  const config = await getConfig()
-  const token = typeof body.token === 'string' ? body.token : ''
-  if (!config.install_token || token !== config.install_token) {
-    return c.json(
-      { error: 'El código de instalación no coincide con el de la base. Pegá el SQL de nuevo y volvé a intentar.' },
-      403,
-    )
+  // La prueba de que es el dueño.
+  const { accessToken } = loadEnv().supabase
+  if (accessToken) {
+    const cola = typeof body.tokenTail === 'string' ? body.tokenTail.trim() : ''
+    if (!cola || cola !== accessToken.slice(-8)) {
+      return c.json(
+        { error: 'Los últimos 8 caracteres no coinciden con el token de acceso cargado en el hosting.' },
+        403,
+      )
+    }
+  } else {
+    const config = await getConfig()
+    const token = typeof body.token === 'string' ? body.token : ''
+    if (!config.install_token || token !== config.install_token) {
+      return c.json(
+        { error: 'El código de instalación no coincide con el de la base. Pegá el SQL de nuevo y volvé a intentar.' },
+        403,
+      )
+    }
   }
 
   const pack = typeof body.pack === 'string' && body.pack in PACKS ? body.pack : null
@@ -172,9 +186,22 @@ installRoute.post('/finish', async (c) => {
     if (error) throw error
     await addTeamMember(email, 'owner')
 
+    // 5. Con token: se cierran los registros abiertos. Si falla, no es
+    // grave (la base igual no le muestra nada a quien no es del equipo),
+    // pero queda en el registro.
+    let signupsCerrados = false
+    try {
+      signupsCerrados = await closeSignups()
+    } catch (err) {
+      console.warn('[instalar] no se pudieron cerrar los registros de Auth:', describe(err))
+    }
+
     forgetSettings()
-    return c.json({ ok: true })
+    return c.json({ ok: true, signupsCerrados })
   } catch (err) {
     return c.json({ error: describe(err) }, 502)
   }
 })
+
+// Se re-exporta para que el arranque pueda leer el estado sin pasar por HTTP.
+export { appliedMigrations }

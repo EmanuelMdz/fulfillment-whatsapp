@@ -1,8 +1,7 @@
 # Poner el sistema en línea
 
-Tres piezas, un solo lugar donde mirar: **Supabase** (la base y el login),
-**Railway** (el servidor y el puente de WhatsApp). Veinte minutos, sin
-terminal.
+Dos cuentas y un chip: **Supabase** (la base y el login) y **Railway** (el
+servidor y el puente de WhatsApp). Veinte minutos, sin terminal.
 
 Railway es lo recomendado. Render sirve igual; lo único que cambia es que su
 plan gratuito duerme el servicio, y un servicio dormido no manda seguimientos
@@ -13,23 +12,24 @@ ni se da cuenta de que el número se desconectó.
 ## 1. Supabase — la base
 
 1. https://supabase.com → **New project**. Elegí la región más cercana.
-2. **Settings → API**. Copiá tres cosas: **Project URL**, la clave
-   **anon public** y la clave **service_role**.
-3. **Authentication → Sign In / Providers** → desactivá **"Allow new users to
-   sign up"**. Los usuarios los crea el panel; con esto prendido, cualquiera
-   podría registrarse. (El sistema igual no le muestra nada a quien no sea
-   del equipo, pero mejor cerrar la puerta.)
+2. **Settings → API** → copiá la **Project URL**.
+3. Arriba a la derecha, tu avatar → **Account → Access Tokens → Generate new
+   token**. Ponele un nombre ("bot") y copiá el token: empieza con `sbp_` y
+   se muestra una sola vez.
+
+   Con ese token el servidor hace el resto: busca las claves del proyecto,
+   crea las tablas y apaga los registros abiertos. Y te sirve después para
+   que tu Claude siga mejorando el sistema contra tu misma base.
 
 ## 2. Railway — el servidor
 
-1. https://railway.app → **New Project → Deploy from GitHub repo** → este
-   repo. Detecta que es Node y usa `railway.json`.
-2. Pestaña **Variables → Raw Editor** → pegá esto con tus tres valores:
+1. https://railway.app → **New Project → Deploy from GitHub repo** → tu fork
+   de este repo. Detecta que es Node y usa `railway.json`.
+2. Pestaña **Variables → Raw Editor** → pegá esto con tus dos valores:
 
    ```
    SUPABASE_URL=https://TU_PROYECTO.supabase.co
-   SUPABASE_ANON_KEY=eyJ...
-   SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   SUPABASE_ACCESS_TOKEN=sbp_...
    ```
 
    **No cargues `PORT`.** Railway la inyecta sola y pisarla rompe el despliegue.
@@ -37,9 +37,9 @@ ni se da cuenta de que el número se desconectó.
 
 3. **Settings → Networking → Generate Domain**. Esa es la URL de todo: del
    panel, del webhook y de la API.
-4. Abrí la URL. El **asistente de instalación** te pide pegar un SQL en
-   Supabase (SQL Editor → New query → pegar → Run), después el nombre del
-   negocio, el pack y tu usuario. Listo: entrás al panel.
+4. Abrí la URL. Las tablas ya se crearon al arrancar; el asistente te pide
+   el pack, el nombre del negocio, tu usuario, y los últimos 8 caracteres del
+   token (para confirmar que sos vos). Listo: entrás al panel.
 
 ## 3. Railway — el puente de WhatsApp (WAHA)
 
@@ -73,6 +73,24 @@ El puente es el servicio que maneja la sesión de WhatsApp Web. Va en el
    de grupos del número conectado).
 5. Panel → **Probar el bot**: charlá. Después mandate un WhatsApp desde otro
    teléfono. Si contesta, terminaste.
+
+---
+
+## Si preferís no darle el token de tu cuenta
+
+Cargá en Railway, en vez del token, las dos claves del proyecto
+(Settings → API):
+
+```
+SUPABASE_URL=https://TU_PROYECTO.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+Con eso el servidor no puede crear tablas: el asistente te muestra el SQL y
+lo pegás vos en Supabase → SQL Editor → Run (un solo paste, y otro por cada
+actualización que traiga migraciones). Y apagá a mano **Authentication →
+Sign In / Providers → "Allow new users to sign up"**.
 
 ---
 
@@ -115,10 +133,10 @@ automáticos: eso es del plan Pro.
 ### Actualizar
 
 Cada push a `main` redespliega solo. Si la actualización trae cambios en la
-base, el panel muestra una franja *"Hay cambios pendientes en la base de
-datos"* con el botón **Aplicar**: es el mismo paso de pegar un SQL en
-Supabase. Si algo sale mal, Railway guarda los despliegues anteriores y se
-vuelve atrás desde la pestaña Deployments.
+base, el servidor los aplica al arrancar (con el token). Si por algo quedó
+algo pendiente, el panel muestra una franja *"Hay cambios pendientes en la
+base de datos"* con el botón **Aplicar**. Si algo sale mal, Railway guarda
+los despliegues anteriores y se vuelve atrás desde la pestaña Deployments.
 
 ### Respaldos
 
@@ -129,5 +147,5 @@ WhatsApp vive en el volumen del puente.
 ### Registros
 
 Todo sale por la salida estándar y se ve en la pestaña Deployments de Railway.
-Si el servidor no arranca, ahí está el motivo: casi siempre es una de las tres
-variables que falta.
+Si el servidor no arranca, ahí está el motivo: casi siempre es una de las dos
+variables que falta o el token que no es válido.

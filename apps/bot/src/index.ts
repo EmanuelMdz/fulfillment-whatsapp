@@ -17,8 +17,9 @@ import { Hono } from 'hono'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadEnv } from './config/env.js'
+import { initEnv } from './config/env.js'
 import { getSettings, hasLlm, hasWhatsapp } from './config/settings.js'
+import { applyPendingMigrations, canAutoMigrate } from './db/migrate.js'
 import { recoverUnansweredTurns } from './db/queries.js'
 import { requirePanelUser } from './middleware/auth.js'
 import { healthRoute } from './routes/health.js'
@@ -30,7 +31,23 @@ import { startFollowups } from './workers/followups.js'
 import { startSendQueue } from './workers/send-queue.js'
 import { startTurns } from './workers/turns.js'
 
-const env = loadEnv()
+// Con el token de acceso, esto le pide las claves del proyecto a
+// Supabase; por eso es async y se espera antes de levantar nada.
+const env = await initEnv()
+
+// La base al día ANTES de atender: con el token, las tablas que falten
+// se crean acá (primera instalación o una actualización que trajo una
+// migración nueva). Sin token, el asistente del panel muestra el SQL.
+if (canAutoMigrate()) {
+  try {
+    const aplicadas = await applyPendingMigrations()
+    if (aplicadas.length) console.log(`[base] migraciones aplicadas: ${aplicadas.join(', ')}`)
+    else console.log('[base] al día')
+  } catch (err) {
+    console.error(`[base] no se pudieron aplicar las migraciones: ${describe(err)}`)
+  }
+}
+
 const app = new Hono()
 
 // serveStatic resuelve las rutas contra el directorio donde se ejecutó el

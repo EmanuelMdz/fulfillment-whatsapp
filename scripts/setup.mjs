@@ -8,7 +8,7 @@
  * ni la contraseña de Postgres. Ver apps/bot/src/routes/install.ts.
  *
  * Este script solo hace lo que el panel no puede: dejar listo el .env
- * local con las tres variables de Supabase, y decirte qué sigue.
+ * local con las dos variables de Supabase, y decirte qué sigue.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -22,9 +22,8 @@ const envPath = join(root, '.env')
 const examplePath = join(root, '.env.example')
 
 const VARIABLES = [
-  ['SUPABASE_URL', 'Project URL (https://xxxx.supabase.co)'],
-  ['SUPABASE_ANON_KEY', 'anon public'],
-  ['SUPABASE_SERVICE_ROLE_KEY', 'service_role'],
+  ['SUPABASE_URL', 'Settings → API → Project URL'],
+  ['SUPABASE_ACCESS_TOKEN', 'Account → Access Tokens → Generate new token, empieza con sbp_'],
 ]
 
 function parseEnv(text) {
@@ -53,10 +52,11 @@ async function main() {
 
   let texto = readFileSync(envPath, 'utf8')
   const env = parseEnv(texto)
-  const faltan = VARIABLES.filter(([k]) => !env[k] || env[k].includes('TU_PROYECTO'))
+  const faltan = VARIABLES.filter(([k]) => !env[k] || env[k].includes('TU_PROYECTO') || env[k] === 'sbp_')
 
   if (faltan.length) {
-    console.log('  Las tres variables salen de Supabase → Settings → API.\n')
+    console.log('  Dos variables, las dos de Supabase. Con el token el servidor busca las claves,')
+    console.log('  crea las tablas y apaga los registros abiertos.\n')
     const rl = createInterface({ input: stdin, output: stdout })
     for (const [k, ayuda] of faltan) {
       const valor = (await rl.question(`  ${k} (${ayuda}): `)).trim()
@@ -69,14 +69,14 @@ async function main() {
     writeFileSync(envPath, texto)
     console.log('\n  .env guardado.')
   } else {
-    console.log('  El .env ya tiene las tres variables.')
+    console.log('  El .env ya tiene las dos variables.')
   }
 
   console.log('\n  Lo que sigue:\n')
   console.log('    1. npm run build   (compila el panel adentro del servidor)')
-  console.log('    2. npm run dev     (servidor en http://localhost:3000)')
-  console.log('    3. Abrí http://localhost:3000 — el panel te guía para instalar la base,')
-  console.log('       elegir el pack y crear tu usuario. Después: Conexión (WhatsApp) y Studio (IA).\n')
+  console.log('    2. npm run dev     (servidor en http://localhost:3000 — crea las tablas al arrancar)')
+  console.log('    3. Abrí http://localhost:3000 — el panel te pide el pack, el nombre del negocio')
+  console.log('       y tu usuario. Después: Conexión (WhatsApp) y Studio (IA).\n')
   console.log('  Para ponerlo en línea, seguí docs/DEPLOY.md.\n')
 }
 

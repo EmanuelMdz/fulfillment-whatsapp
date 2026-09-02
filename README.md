@@ -5,7 +5,9 @@ pedido y le pasa la conversación a una persona cuando hace falta.
 
 Un repo, un deploy, una URL. Los módulos se prenden y se apagan desde el panel.
 Las claves, los prompts y toda la configuración también: **fuera del panel
-solo viven tres variables**, las de conexión a la base.
+solo viven dos variables**, la URL del proyecto de Supabase y el token de
+acceso. Con eso el servidor busca las claves, crea las tablas y deja todo
+listo.
 
 ## Dos packs
 
@@ -26,17 +28,17 @@ En tu computadora:
 
 ```bash
 npm install
-npm run setup      # deja listo el .env con las tres variables de Supabase
+npm run setup      # deja listo el .env con las dos variables de Supabase
 npm run build      # compila el panel dentro del servidor
-npm run dev        # servidor en http://localhost:3000
+npm run dev        # servidor en http://localhost:3000 — crea las tablas al arrancar
 ```
 
-Abrí http://localhost:3000. Si la base está vacía, el panel muestra el
-**asistente de instalación**: pegás un SQL en Supabase, elegís el pack, creás
-tu usuario. Después, desde el panel: Conexión (WhatsApp) y Studio (la IA).
+Abrí http://localhost:3000. Si la base está recién creada, el panel muestra
+el **asistente de instalación**: elegís el pack, el nombre del negocio, tu
+usuario. Después, desde el panel: Conexión (WhatsApp) y Studio (la IA).
 
-Para ponerlo en línea, `docs/DEPLOY.md`: Railway con tres variables, y el
-mismo asistente.
+Para ponerlo en línea, `docs/DEPLOY.md`: Railway con las mismas dos
+variables, y el mismo asistente.
 
 `npm run dev:panel` levanta el panel aparte con recarga en caliente, para
 desarrollarlo.

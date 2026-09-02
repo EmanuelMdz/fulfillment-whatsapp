@@ -26,6 +26,13 @@ de esto.
 > catorce fallas del punto 4). Lo que sigue abajo es el diagnóstico tal como
 > se escribió; sirve para entender el porqué de cada cambio. Lo único que
 > queda por verificar con un número conectado es la 4.2 (la carrera del eco).
+>
+> **Un cambio sobre el punto 1 y el 2, decidido después:** el entorno quedó
+> en **dos** variables, no tres: `SUPABASE_URL` y `SUPABASE_ACCESS_TOKEN`.
+> Con el token de la cuenta el servidor busca las claves del proyecto, crea
+> las tablas al arrancar y apaga los registros abiertos; el paste de SQL
+> quedó como alternativa para quien no quiera dar el token. Ver la decisión
+> 9 en `DECISIONES.md`.
 
 ---
 

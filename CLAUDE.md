@@ -69,12 +69,15 @@ Nombres de variables y de tablas en inglés; comentarios, interfaz y
 documentación en español.
 
 ### 11. Todo se configura desde el panel
-Fuera del panel viven **tres variables**: `SUPABASE_URL`, `SUPABASE_ANON_KEY`
-y `SUPABASE_SERVICE_ROLE_KEY`. Claves de IA, puente de WhatsApp, prompts,
-tiempos: todo va a `app_config` o `app_secrets` con su pantalla. Una variable
-de entorno nueva se justifica por escrito en `DECISIONES.md`. Las claves
-guardadas nunca vuelven enteras al navegador: solo si están cargadas y sus
-últimos caracteres (`config/settings.ts`).
+Fuera del panel viven **dos variables**: `SUPABASE_URL` y
+`SUPABASE_ACCESS_TOKEN` (el token de cuenta `sbp_…`; con él el servidor busca
+las claves, crea las tablas y apaga los registros — `config/supabase-admin.ts`).
+Claves de IA, puente de WhatsApp, prompts, tiempos: todo va a `app_config` o
+`app_secrets` con su pantalla. Una variable de entorno nueva se justifica por
+escrito en `DECISIONES.md`. Las claves guardadas nunca vuelven enteras al
+navegador: solo si están cargadas y sus últimos caracteres
+(`config/settings.ts`). El modo sin token (las dos claves del proyecto y el
+SQL pegado a mano) tiene que seguir funcionando, pero es el secundario.
 
 ## Dónde vive qué
 

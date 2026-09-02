@@ -5,14 +5,18 @@ a propósito: ver `docs/DECISIONES.md`.
 
 ## Cómo se aplica
 
-El servidor no tiene conexión directa a Postgres (solo la API de Supabase), y
-la API no puede crear tablas. Por eso las migraciones se pegan en el editor
-SQL de Supabase — un solo paste:
+Con `SUPABASE_ACCESS_TOKEN` en el entorno (lo normal), **el servidor las
+aplica solo al arrancar** a través de la API de administración de Supabase
+(`db/migrate.ts`): compara los archivos de esta carpeta con la tabla
+`_migrations` y corre lo que falta. Una actualización que trae una
+migración nueva se aplica en el próximo deploy; si quedó algo pendiente, el
+panel avisa con una franja y un botón Aplicar.
 
-- **Desde el panel**: al abrirlo contra una base vacía aparece el asistente de
-  instalación, con el SQL que falta y un botón Copiar. Cuando una
-  actualización trae migraciones nuevas, el panel avisa con una franja y el
-  mismo botón.
+Sin token, el servidor no puede crear tablas (la API normal no lo permite) y
+las migraciones se pegan en el editor SQL de Supabase — un solo paste:
+
+- **Desde el panel**: el asistente de instalación muestra el SQL que falta y
+  un botón Copiar.
 - **Desde la terminal**: `npm run db:sql` imprime todas las migraciones en
   orden, para pegar.
 

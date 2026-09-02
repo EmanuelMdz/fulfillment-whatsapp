@@ -144,15 +144,23 @@ producto cambia. Menos de una hora, y es el paso más barato de todo el proyecto
 
 ---
 
-## 9. Todo se configura desde el panel; fuera de él, tres variables
+## 9. Todo se configura desde el panel; fuera de él, dos variables
 
 **Decisión.** Las claves de IA, la dirección y la clave del puente de
 WhatsApp, los tiempos del bot y la ventana nocturna viven en la base
 (`app_config` y `app_secrets`) y se editan desde el panel. En el entorno
-quedan solo `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`:
-lo mínimo para que el proceso pueda leer el resto. La clave pública del
-panel también la sirve el servidor en tiempo de ejecución (`/config.js`), así
-un mismo build anda en cualquier instalación.
+quedan solo `SUPABASE_URL` y `SUPABASE_ACCESS_TOKEN`, el token de acceso de
+la cuenta de Supabase: con él el servidor busca las claves del proyecto,
+crea las tablas y apaga los registros abiertos. La clave pública del panel
+también la sirve el servidor en tiempo de ejecución (`/config.js`), así un
+mismo build anda en cualquier instalación.
+
+**Sobre el token.** Abre la cuenta entera de Supabase, no solo ese proyecto,
+y se planteó guardarlo solo en memoria durante la instalación. Se decidió
+que va en el entorno, a propósito: el alumno sabe qué es, y ese mismo token
+es el que después le sirve a su Claude para seguir mejorando el sistema
+contra su base. Quien no quiera darlo carga en su lugar las dos claves del
+proyecto y pega el SQL a mano.
 
 **Por qué.** El producto lo instala gente que recién empieza. Cada valor en un
 archivo de texto o en la pantalla de variables del hosting es un lugar donde
@@ -169,16 +177,18 @@ todo se edita desde el panel, quién entra al panel importa más — de ahí
 
 ## 10. La instalación es una pantalla, no un script
 
-**Decisión.** Al abrir el panel contra una base vacía aparece un asistente:
-pegar un SQL en Supabase, elegir el pack, crear el usuario. El script de
-terminal quedó solo para preparar el `.env` local.
+**Decisión.** Al arrancar contra una base recién creada, el servidor crea las
+tablas solo (con el token de acceso) y el panel muestra un asistente:
+elegir el pack, el nombre, crear el usuario. El script de terminal quedó
+solo para preparar el `.env` local.
 
 **Por qué.** El instalador anterior pedía la URI de Postgres con la
-contraseña de la base, que nadie tiene a mano. El servidor con la clave de
-servicio puede hacer todo lo demás; lo único que no puede es crear tablas, y
-para eso alcanza con un paste en el editor SQL. Un solo paso difícil en vez
-de tres.
+contraseña de la base, que nadie tiene a mano. Con el token de acceso el
+servidor puede hacer todo, incluso crear tablas y cambiar la configuración
+de Auth. Sin token, lo único que no puede es crear tablas, y para eso
+alcanza con un paste en el editor SQL.
 
 **Lo que cuesta.** Las rutas del asistente son públicas (no hay usuario
-todavía) y se protegen con un código que viaja dentro del SQL: quien lo pegó
-en esa base es quien puede terminar la instalación.
+todavía) y se protegen con una prueba de que quien instala es el dueño: los
+últimos caracteres del token que cargó en el hosting, o el código que viaja
+dentro del SQL que pegó en su base.
