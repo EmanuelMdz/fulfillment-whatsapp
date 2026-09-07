@@ -20,8 +20,9 @@ las migraciones se pegan en el editor SQL de Supabase — un solo paste:
 - **Desde la terminal**: `npm run db:sql` imprime todas las migraciones en
   orden, para pegar.
 
-Se puede pegar más de una vez: todo usa `if not exists` / `or replace`, y la
-tabla `_migrations` anota lo aplicado para que el asistente sepa qué falta.
+El SQL generado se puede pegar más de una vez: consulta `_migrations` antes
+de ejecutar cada archivo. La migración y su registro se confirman juntos.
+No pegues archivos históricos sueltos encima de una base existente.
 
 ## Migraciones
 
@@ -37,6 +38,11 @@ tabla `_migrations` anota lo aplicado para que el asistente sepa qué falta.
 | `0008_equipo.sql` | `team_members` y las policies que solo dejan entrar al equipo |
 | `0009_robustez.sql` | Reclamar envíos y turnos que murieron con un reinicio; limpieza del registro |
 | `0010_instalador.sql` | El código de instalación del asistente |
+| `0011_un_solo_prompt.sql` | Un solo prompt en markdown (`sistema`) en vez de tres cajas y dos mensajes fijos |
+| `0012_estado_sesion.sql` | El estado de la sesión de WhatsApp, para avisar cuando el número se cae |
+| `0013_modo_prueba.sql` | Modo prueba: el bot solo le contesta a los números autorizados |
+| `0014_instalacion_segura.sql` | Finalización atómica del asistente, registro privado y modo prueba inicial |
+| `0015_recepcion_atomica.sql` | Guardar un mensaje y agendar su turno en una transacción, con deduplicación |
 
 Numeración única y correlativa. Nunca se edita una migración ya aplicada: se
 agrega la siguiente. Toda tabla nueva arranca con RLS prendida — y con su

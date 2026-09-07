@@ -143,8 +143,25 @@ export async function saveMessage(input: {
 
   // El webhook puede repetir un mensaje. Chocar contra el unique acá es
   // exactamente lo que queremos que pase.
-  if (res.error) return null
+  if (res.error?.code === '23505') return null
+  if (res.error) throw res.error
   return res.data.id as string
+}
+
+/** Recibir y agendar se confirman juntos: un fallo devuelve error para que WAHA reintente. */
+export async function receiveCustomerMessage(input: {
+  conversationId: string; externalId: string; body: string;
+  mediaUrl: string | null; mediaKind: string | null; providerTs: Date;
+  canRespond: boolean; delaySeconds: number;
+}): Promise<boolean> {
+  const res = await db().rpc('receive_customer_message', {
+    conversation_id_arg: input.conversationId, external_id_arg: input.externalId,
+    body_arg: input.body, media_url_arg: input.mediaUrl, media_kind_arg: input.mediaKind,
+    provider_ts_arg: input.providerTs.toISOString(), can_respond: input.canRespond,
+    delay_seconds: input.delaySeconds,
+  })
+  if (res.error) throw res.error
+  return res.data === true
 }
 
 /**
@@ -267,6 +284,12 @@ export interface AppConfig {
   // ── Instalación (0010) ──
   install_token: string | null
   installed_at: string | null
+  // ── Estado de la conexión, lo escribe el vigilante (0012) ──
+  whatsapp_status: string | null
+  whatsapp_status_at: string | null
+  // ── Modo prueba (0013): el bot solo contesta a estos números ──
+  test_mode: boolean
+  test_numbers: string[]
 }
 
 /** Los valores de una instalación recién creada. También son el piso si una columna falta. */
@@ -293,6 +316,10 @@ export const DEFAULT_CONFIG: AppConfig = {
   quiet_hours_end: 9,
   install_token: null,
   installed_at: null,
+  whatsapp_status: null,
+  whatsapp_status_at: null,
+  test_mode: true,
+  test_numbers: [],
 }
 
 /** La fila única de configuración. Si falta (instalación a medias), valores por defecto. */
@@ -319,6 +346,8 @@ export const EDITABLE_CONFIG_KEYS = [
   'send_pause_max_ms',
   'quiet_hours_start',
   'quiet_hours_end',
+  'test_mode',
+  'test_numbers',
 ] as const
 
 export async function updateConfig(patch: Partial<AppConfig>): Promise<void> {

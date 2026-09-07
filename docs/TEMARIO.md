@@ -1,5 +1,8 @@
 # Temario
 
+> Propuesta de curso, no listado de funciones entregadas. Cobros, inventario,
+> horarios por franja, asignación, imágenes y audios siguen pendientes.
+
 Los módulos del repo son los módulos del curso. Cada bandera que un alumno
 prende es una clase, y el temario deja de ser una lista inventada para pasar a
 ser el mapa real del producto.
@@ -13,7 +16,7 @@ ser el mapa real del producto.
 | 1 | Qué hace el sistema y qué no | Criterio para saber a qué cliente sí y a cuál no |
 | 2 | Base de datos y variables | Su Supabase creado y las migraciones aplicadas |
 | 3 | Conectar el número por QR | El bot contestando en su WhatsApp |
-| 4 | El número no se quema | Número dedicado, calentamiento, cola de envío con pausas |
+| 4 | Límites del puente y del canal | Número dedicado, cola con pausas y riesgo de desconexión o bloqueo |
 
 ## Bloque 2 — Que conteste bien
 

@@ -41,5 +41,7 @@ export declare const MODULES: ModuleDef[]
 export declare const CORE_FEATURES: string[]
 export declare const PACKS: Record<string, PackDef>
 export declare const SEEDS: Record<string, SeedItem[]>
+export declare const MIGRATION_REGISTRY_SQL: string
+export declare function migrationSql(name: string, source: string): string
 export declare function label(pack: string, key: string): string
 export declare function modulesForPack(pack: string): string[]

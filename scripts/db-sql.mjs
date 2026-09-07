@@ -15,16 +15,16 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MIGRATION_REGISTRY_SQL, migrationSql } from '../packages/core/src/migrations.js'
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'db', 'migrations')
 
 const partes = [
   '-- Fulfillment WhatsApp — pegá TODO esto en Supabase → SQL Editor → Run.',
-  'create table if not exists public._migrations (name text primary key, applied_at timestamptz not null default now());',
+  MIGRATION_REGISTRY_SQL,
 ]
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
   partes.push(`-- >>> ${file}`)
-  partes.push(readFileSync(join(dir, file), 'utf8'))
-  partes.push(`insert into public._migrations (name) values ('${file}') on conflict do nothing;`)
+  partes.push(migrationSql(file, readFileSync(join(dir, file), 'utf8')))
 }
 process.stdout.write(partes.join('\n\n') + '\n')

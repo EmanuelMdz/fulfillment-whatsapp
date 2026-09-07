@@ -8,6 +8,7 @@
  */
 
 export { SEEDS } from './seeds.js'
+export { MIGRATION_REGISTRY_SQL, migrationSql } from './migrations.js'
 
 /**
  * Módulos que se pueden prender y apagar. El núcleo no está acá: siempre va.
@@ -50,6 +51,37 @@ export const CORE_FEATURES = [
  * pedido, y por qué motivos la IA deriva a una persona.
  */
 export const PACKS = {
+  // El punto de partida para cualquier negocio: palabras neutras, un
+  // circuito de pedido simple, motivos de derivación que sirven en
+  // cualquier rubro. Desde acá el dueño renombra lo que quiera en
+  // Ajustes; los otros dos packs son atajos para dos rubros comunes.
+  general: {
+    label: 'General',
+    modules: [],
+    labels: {
+      contact: 'Cliente',
+      contact_plural: 'Clientes',
+      item: 'Producto',
+      item_plural: 'Catálogo',
+      order: 'Pedido',
+      order_plural: 'Pedidos',
+      order_new: 'Nuevo pedido',
+    },
+    stages: [
+      { key: 'nuevo', label: 'Nuevo', final: false },
+      { key: 'en_proceso', label: 'En proceso', final: false },
+      { key: 'completado', label: 'Completado', final: true },
+      { key: 'cancelado', label: 'Cancelado', final: true },
+    ],
+    reasons: [
+      { key: 'pedir_humano', label: 'Pide hablar con una persona' },
+      { key: 'queja', label: 'Queja o reclamo' },
+      { key: 'urgencia', label: 'Urgencia' },
+      { key: 'sin_avance', label: 'La conversación no avanza' },
+      { key: 'no_supo', label: 'La IA no supo responder' },
+    ],
+  },
+
   ecommerce: {
     label: 'Ecommerce',
     modules: ['stock', 'payments'],

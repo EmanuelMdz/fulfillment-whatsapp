@@ -1,5 +1,9 @@
 # Auditoría del repo — 1 de setiembre de 2026
 
+> Registro histórico: contiene propuestas que luego se implementaron o cambiaron.
+> No aplicar sus fragmentos como instrucciones actuales. Para instalar usá
+> PRIMEROS_PASOS.md; para el estado de publicación, LANZAMIENTO.md.
+
 Objetivo de la auditoría: que un alumno pueda **copiar, pegar y tener el bot
 andando en un negocio mañana**, sin tocar un archivo de texto ni entrar a
 configurar variables en el hosting. Todo lo configurable tiene que vivir en el

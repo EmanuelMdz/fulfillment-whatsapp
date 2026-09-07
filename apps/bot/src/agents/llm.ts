@@ -30,6 +30,7 @@ async function gemini(llm: Llm, system: string, turns: Turn[]): Promise<string> 
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${llm.model}:generateContent?key=${llm.geminiKey}`
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(60_000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -58,6 +59,7 @@ async function openai(llm: Llm, system: string, turns: Turn[]): Promise<string> 
   if (!llm.openaiKey) throw new Error('Falta la clave de OpenAI: cargala en el panel, pestaña Studio')
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    signal: AbortSignal.timeout(60_000),
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

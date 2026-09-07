@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { getSettings } from '../config/settings.js'
+import { botPuedeResponder } from '../config/test-mode.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
@@ -9,9 +10,8 @@ import {
   findOrCreateConversation,
   pauseForHuman,
   recentlySentByUs,
-  reopenConversation,
+  receiveCustomerMessage,
   saveMessage,
-  scheduleTurn,
 } from '../db/queries.js'
 
 /**
@@ -21,9 +21,8 @@ import {
  * tomó la conversación, y agenda el turno. Contestar es trabajo de otro
  * (workers/turns.ts).
  *
- * Responde 200 SIEMPRE que el mensaje se haya recibido, aunque después algo
- * falle: si devolvemos error, el puente reintenta y terminamos con el mismo
- * mensaje cuatro veces.
+ * Confirma solo lo que quedó guardado y agendado. La transacción y el
+ * índice de external_id permiten reintentos sin perder ni duplicar turnos.
  */
 export const webhookRoute = new Hono()
 
@@ -63,8 +62,12 @@ webhookRoute.post('/', async (c) => {
       // Si ya lo teníamos, lo mandamos nosotros por la cola. Y si todavía
       // no está guardado pero la cola lo acaba de mandar, también es
       // nuestro: el eco le ganó la carrera al guardado.
-      if (yaGuardado || (await recentlySentByUs(mensaje.chatId, mensaje.text))) {
+      if ((yaGuardado && yaGuardado.author !== 'human') || (!yaGuardado && await recentlySentByUs(mensaje.chatId, mensaje.text))) {
         return c.json({ ok: true, eco: 'propio' })
+      }
+
+      if (conversacion.handback_at && mensaje.timestamp.getTime() <= new Date(conversacion.handback_at).getTime()) {
+        return c.json({ ok: true, ignorado: 'eco anterior a devolver al bot' })
       }
 
       // No lo teníamos: lo escribió una persona desde el celular.
@@ -87,30 +90,26 @@ webhookRoute.post('/', async (c) => {
     }
 
     // ── Mensaje del cliente ──────────────────────────────────
-    const mensajeId = await saveMessage({
+    const permitido = botPuedeResponder(s.config, mensaje.chatId)
+    const guardado = await receiveCustomerMessage({
       conversationId: conversacion.id,
       externalId: mensaje.externalId,
-      direction: 'in',
-      author: 'customer',
       body: mensaje.text,
       mediaUrl: mensaje.media?.url || null,
       mediaKind: mensaje.media?.kind ?? null,
       providerTs: mensaje.timestamp,
+      canRespond: permitido,
+      delaySeconds: s.bot.debounceSeconds,
     })
 
     // saveMessage devuelve null cuando el mensaje ya estaba: el puente lo
     // reenvió. Sin esto, cada reintento correría el turno de nuevo.
-    if (!mensajeId) return c.json({ ok: true, ignorado: 'mensaje repetido' })
-
-    // El cliente escribió: cualquier recordatorio pendiente quedó viejo.
-    // El turno que viene genera los que correspondan de nuevo.
-    await cancelPendingFollowups(conversacion.id)
+    if (!guardado) return c.json({ ok: true, ignorado: 'mensaje repetido' })
 
     // Una conversación cerrada a la que el cliente vuelve a escribir se
     // reabre sola: "cerrado" es "terminó", no "no atender". Descartar a
     // alguien para siempre es una decisión humana, y se toma en el panel.
     if (conversacion.state === 'cerrado') {
-      await reopenConversation(conversacion.id)
       conversacion.state = 'bot'
       logEvent({ eventType: 'conversation.reopened', conversationId: conversacion.id })
     }
@@ -120,11 +119,21 @@ webhookRoute.post('/', async (c) => {
       return c.json({ ok: true, guardado: true, turno: 'no, está con un humano' })
     }
 
-    await scheduleTurn(conversacion.id, mensajeId, s.bot.debounceSeconds)
+    // Modo prueba: el mensaje ya quedó guardado y se ve en el panel (una
+    // persona puede contestarlo a mano), pero el bot no le habla a nadie
+    // que no esté en la lista de números autorizados.
+    if (!permitido) {
+      logEvent({
+        eventType: 'turn.skipped',
+        conversationId: conversacion.id,
+        payload: { motivo: 'modo_prueba' },
+      })
+      return c.json({ ok: true, guardado: true, turno: 'no, modo prueba' })
+    }
+
     return c.json({ ok: true, guardado: true, turno: `en ${s.bot.debounceSeconds}s` })
   } catch (error) {
-    // Guardamos el problema pero contestamos 200: reintentar no lo arregla
-    // y sí duplica mensajes.
+    // WAHA puede reintentar: la recepción es atómica y deduplica por id.
     const detalle = describe(error)
     console.error('[webhook] falló:', detalle)
     logEvent({
@@ -132,6 +141,6 @@ webhookRoute.post('/', async (c) => {
       severity: 'error',
       payload: { donde: 'webhook', error: detalle.slice(0, 300) },
     })
-    return c.json({ ok: true, error: 'anotado' })
+    return c.json({ ok: false, error: 'No se pudo procesar el mensaje; reintentá.' }, 503)
   }
 })

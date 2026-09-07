@@ -72,7 +72,20 @@ export function adjustForNightWindow(date: Date, timezone: string, start = 23, e
   return corrida
 }
 
+// Lo que este turno le pide al modelo. El prompt del negocio (el mismo de
+// siempre) va arriba; si tiene una sección "Seguimientos", esas reglas
+// mandan. Si no la tiene, valen las de acá.
+const TAREA = [
+  '## Tu tarea AHORA',
+  'No estás contestando al cliente: estás decidiendo si esta conversación merece un recordatorio más tarde, y escribiéndolo. Si el prompt de arriba tiene una sección de seguimientos, seguí esas reglas. Si no:',
+  '- El recordatorio retoma LO ÚLTIMO que quedó pendiente. Si el negocio dejó una pregunta en el aire, volvé sobre ESA pregunta.',
+  '- Escribí como una persona que retoma una conversación, no como un sistema de avisos.',
+  '- Si la conversación terminó bien, si el cliente dijo que no, o si pidió que no le escriban: ningún recordatorio.',
+  '- Nunca inventes que hay un pedido anotado o algo reservado si no lo hay.',
+].join('\n')
+
 const CONTRATO = [
+  '## Formato de tu respuesta',
   'Respondé SOLO con un JSON válido, nada más:',
   '{"seguimientos": [{"mensaje": "...", "en_horas": 3}]}',
   '',
@@ -96,18 +109,18 @@ export interface FollowupPlan {
  * lista. No agenda nada: eso es de planFollowups. `previos` son los
  * recordatorios ya enviados en esta conversación.
  */
-export async function decideFollowups(
-  channel: string,
-  historial: HistoryMessage[],
-  config: AppConfig,
-  previos: string[],
-): Promise<FollowupPlan[]> {
-  const [prompts, s] = await Promise.all([getPrompts(channel), getSettings()])
-
-  const system = [
+/**
+ * El texto de sistema del agente de recordatorios: el mismo prompt del
+ * negocio, más la tarea de este turno y su formato. Studio lo muestra
+ * tal cual, para que se entienda que hay un segundo agente y qué lee.
+ */
+export async function buildFollowupSystem(channel: string, config: AppConfig): Promise<string> {
+  const prompts = await getPrompts(channel)
+  return [
     config.business_name ? `Trabajás en: ${config.business_name}.` : '',
-    prompts.seguimientos ?? '',
+    prompts.sistema?.trim() ?? '',
     `Ahora es: ${formatNowForPrompt(config.timezone)} (hora local del negocio).`,
+    TAREA,
     // La regla anti-repetición vive acá y no en el prompt editable: es de
     // las que no se pueden perder editando desde el panel.
     'PROHIBIDO repetir el ángulo o el contenido de un recordatorio ya enviado antes en esta conversación.',
@@ -115,6 +128,15 @@ export async function decideFollowups(
   ]
     .filter(Boolean)
     .join('\n\n')
+}
+
+export async function decideFollowups(
+  channel: string,
+  historial: HistoryMessage[],
+  config: AppConfig,
+  previos: string[],
+): Promise<FollowupPlan[]> {
+  const [system, s] = await Promise.all([buildFollowupSystem(channel, config), getSettings()])
 
   const hilo = historial
     .map((m) => `${m.author === 'customer' ? 'Cliente' : m.author === 'human' ? 'Humano del negocio' : 'Bot'}: ${m.body}`)

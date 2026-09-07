@@ -19,7 +19,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { initEnv } from './config/env.js'
 import { getSettings, hasLlm, hasWhatsapp } from './config/settings.js'
-import { applyPendingMigrations, canAutoMigrate } from './db/migrate.js'
+import { applyPendingMigrations, canAutoMigrate, closeSignups } from './db/migrate.js'
 import { recoverUnansweredTurns } from './db/queries.js'
 import { requirePanelUser } from './middleware/auth.js'
 import { healthRoute } from './routes/health.js'
@@ -29,6 +29,7 @@ import { webhookRoute } from './routes/webhook.js'
 import { describe } from './utils/errors.js'
 import { startFollowups } from './workers/followups.js'
 import { startSendQueue } from './workers/send-queue.js'
+import { startSessionWatch } from './workers/session-watch.js'
 import { startTurns } from './workers/turns.js'
 
 // Con el token de acceso, esto le pide las claves del proyecto a
@@ -40,6 +41,7 @@ const env = await initEnv()
 // migración nueva). Sin token, el asistente del panel muestra el SQL.
 if (canAutoMigrate()) {
   try {
+    await closeSignups()
     const aplicadas = await applyPendingMigrations()
     if (aplicadas.length) console.log(`[base] migraciones aplicadas: ${aplicadas.join(', ')}`)
     else console.log('[base] al día')
@@ -96,6 +98,7 @@ if (hasPanel) {
 startSendQueue()
 startTurns()
 startFollowups()
+startSessionWatch()
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[fw] escuchando en http://localhost:${info.port}`)

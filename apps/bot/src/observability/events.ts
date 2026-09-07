@@ -59,6 +59,11 @@ export const EVENT_TYPES = [
   'followup.sent',
   'followup.dropped',
 
+  // La conexión del número. Un bot desconectado es un negocio sin
+  // atender: por eso queda registrado cuándo se cayó y cuándo volvió.
+  'whatsapp.connected',
+  'whatsapp.disconnected',
+
   // Tareas programadas.
   'cron.completed',
   'cron.error',

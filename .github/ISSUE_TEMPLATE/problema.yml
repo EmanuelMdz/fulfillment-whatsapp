@@ -1,0 +1,22 @@
+name: Problema de instalación o funcionamiento
+description: Contanos el paso y el resultado para poder reproducirlo.
+body:
+  - type: markdown
+    attributes:
+      value: No pegues claves, tokens, QR ni conversaciones de clientes. Usá datos ficticios.
+  - type: textarea
+    attributes:
+      label: Paso que falla
+      description: Indica el documento, el paso exacto y qué esperabas que pasara.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Qué pasó
+      description: Mensaje de error sin secretos y pasos para repetirlo.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Entorno
+      description: Sistema operativo, versión de Node, commit del repo, local o Railway, versión o digest de WAHA y salida de npm run doctor.

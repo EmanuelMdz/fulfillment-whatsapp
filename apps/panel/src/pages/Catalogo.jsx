@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Save } from 'lucide-react'
+import { Package, Pencil, Plus, Save } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { Badge, Button, Card, Checkbox, EmptyState, Field, Input, Notice, PageHeader, Table, Textarea } from '../ui'
 
 /**
  * El catálogo — productos en una tienda, prestaciones en una clínica.
@@ -90,108 +91,130 @@ export default function Catalogo() {
   const nombreItem = labels.item ?? 'Producto'
   const nombrePlural = labels.item_plural ?? 'Catálogo'
 
+  const columnas = [
+    {
+      key: 'name',
+      label: 'Nombre',
+      render: (i) => (
+        <div>
+          <span className="font-semibold text-ink">{i.name}</span>
+          {i.description && <span className="block text-[12.5px] text-ink-3">{i.description}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'price',
+      label: 'Precio',
+      align: 'right',
+      render: (i) => (
+        <span className="font-semibold tabular-nums text-ink">
+          {moneda}
+          {i.price}
+        </span>
+      ),
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      render: (i) => (i.track_stock ? <span className="tabular-nums text-ink-2">{i.stock_qty}</span> : <span className="text-ink-3">—</span>),
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      render: (i) => (i.active ? <Badge tone="green">activo</Badge> : <Badge>inactivo</Badge>),
+    },
+    {
+      key: 'acciones',
+      label: '',
+      align: 'right',
+      render: (i) => (
+        <Button size="sm" icon={Pencil} onClick={() => elegir(i)}>
+          Editar
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <>
-      <h1 className="page-title">{nombrePlural}</h1>
-      <p className="page-sub">
-        La ficha de cada cosa (campo "Lo que la IA sabe") es lo que más mejora las respuestas.
-      </p>
-      {aviso && <p className={aviso.esError ? 'error-text' : 'ok-text'}>{aviso.texto}</p>}
-
-      <div style={{ marginBottom: 10 }}>
-        <button className="btn primary" onClick={nuevo}>
-          <Plus size={15} /> {labels.item ? `Agregar ${labels.item.toLowerCase()}` : 'Agregar'}
-        </button>
-      </div>
-
-      <div className="card">
-        {items.length === 0 && <p className="muted">Catálogo vacío. El bot avisa que no tiene info cargada.</p>}
-        {items.map((item) => (
-          <div className="inbox-item" key={item.id}>
-            <div className="body">
-              <div className="title">
-                {item.name}{' '}
-                <span className="muted" style={{ fontWeight: 400 }}>
-                  · {moneda}{item.price}
-                  {item.track_stock ? ` · stock: ${item.stock_qty}` : ''}
-                </span>{' '}
-                {!item.active && <span className="chip">inactivo</span>}
-              </div>
-              {item.description && <p className="detail">{item.description}</p>}
-            </div>
-            <div className="actions">
-              <button className="btn small" onClick={() => elegir(item)}>Editar</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {seleccion && (
-        <div className="card">
-          <h2>{seleccion === 'nuevo' ? `Nuevo ${nombreItem.toLowerCase()}` : `Editar: ${form.name}`}</h2>
-          <label className="field">
-            <span>Nombre</span>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Precio (entero, en tu moneda)</span>
-            <input
-              type="number"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span>Descripción corta (lo que ve el cliente en una línea)</span>
-            <input
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span>
-              Lo que la IA sabe y puede contar — texto libre: usos, garantía, respuestas a las
-              preguntas típicas. Cuanto más completo, mejor contesta.
-            </span>
-            <textarea
-              value={form.bot_info}
-              onChange={(e) => setForm({ ...form, bot_info: e.target.value })}
-            />
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            />
-            <span>Activo — la IA lo ofrece y puede armar pedidos con esto</span>
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={form.track_stock}
-              onChange={(e) => setForm({ ...form, track_stock: e.target.checked })}
-            />
-            <span>Controlar existencias (módulo Inventario)</span>
-          </label>
-          {form.track_stock && (
-            <label className="field">
-              <span>Cantidad en stock</span>
-              <input
-                type="number"
-                value={form.stock_qty}
-                onChange={(e) => setForm({ ...form, stock_qty: e.target.value })}
-              />
-            </label>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn primary" onClick={guardar} disabled={guardando || !form.name.trim()}>
-              <Save size={15} /> {guardando ? 'Guardando…' : 'Guardar'}
-            </button>
-            <button className="btn" onClick={() => setSeleccion(null)}>Cancelar</button>
-          </div>
-        </div>
+      <PageHeader
+        title={nombrePlural}
+        subtitle='La ficha de cada cosa (campo "Lo que la IA sabe") es lo que más mejora las respuestas.'
+        actions={
+          <Button variant="primary" icon={Plus} onClick={nuevo}>
+            {labels.item ? `Agregar ${labels.item.toLowerCase()}` : 'Agregar'}
+          </Button>
+        }
+      />
+      {aviso && (
+        <Notice tone={aviso.esError ? 'error' : 'ok'} className="mb-4">
+          {aviso.texto}
+        </Notice>
       )}
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
+        <Card>
+          {items.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="Catálogo vacío"
+              text="El bot avisa que no tiene información cargada. Agregá lo primero que vendés."
+            />
+          ) : (
+            <Table columns={columnas} rows={items} />
+          )}
+        </Card>
+
+        {seleccion && (
+          <Card
+            title={seleccion === 'nuevo' ? `Nuevo ${nombreItem.toLowerCase()}` : `Editar: ${form.name}`}
+            className="self-start lg:sticky lg:top-6"
+          >
+            <div className="grid gap-4">
+              <Field label="Nombre">
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </Field>
+              <Field label={`Precio (entero, en ${moneda})`}>
+                <Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+              </Field>
+              <Field label="Descripción corta (lo que ve el cliente en una línea)">
+                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </Field>
+              <Field
+                label="Lo que la IA sabe y puede contar"
+                hint="Texto libre: usos, garantía, respuestas a las preguntas típicas. Cuanto más completo, mejor contesta."
+              >
+                <Textarea value={form.bot_info} onChange={(e) => setForm({ ...form, bot_info: e.target.value })} />
+              </Field>
+              <Checkbox
+                label="Activo — la IA lo ofrece y puede armar pedidos con esto"
+                checked={form.active}
+                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              />
+              <Checkbox
+                label="Controlar existencias (módulo Inventario)"
+                checked={form.track_stock}
+                onChange={(e) => setForm({ ...form, track_stock: e.target.checked })}
+              />
+              {form.track_stock && (
+                <Field label="Cantidad en stock">
+                  <Input
+                    type="number"
+                    value={form.stock_qty}
+                    onChange={(e) => setForm({ ...form, stock_qty: e.target.value })}
+                  />
+                </Field>
+              )}
+              <div className="flex gap-2">
+                <Button variant="primary" icon={Save} onClick={guardar} disabled={guardando || !form.name.trim()}>
+                  {guardando ? 'Guardando…' : 'Guardar'}
+                </Button>
+                <Button onClick={() => setSeleccion(null)}>Cancelar</Button>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
     </>
   )
 }

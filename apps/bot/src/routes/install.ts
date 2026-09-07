@@ -5,7 +5,7 @@ import { loadEnv } from '../config/env.js'
 import { forgetSettings } from '../config/settings.js'
 import { db } from '../db/client.js'
 import { applyPendingMigrations, canAutoMigrate, closeSignups, pendingMigrations, sqlBundle } from '../db/migrate.js'
-import { addTeamMember, appliedMigrations, getConfig, updateConfig } from '../db/queries.js'
+import { appliedMigrations, getConfig } from '../db/queries.js'
 import { describe } from '../utils/errors.js'
 
 /**
@@ -33,9 +33,10 @@ import { describe } from '../utils/errors.js'
 export const installRoute = new Hono()
 
 async function hayUsuarios(): Promise<boolean> {
-  const { data, error } = await db().auth.admin.listUsers({ page: 1, perPage: 1 })
+  const { data, error } = await db().from('team_members').select('email').eq('role', 'owner').limit(1)
+  if (error && ['42P01', 'PGRST205'].includes(error.code)) return false
   if (error) throw error
-  return (data?.users?.length ?? 0) > 0
+  return Boolean(data?.length)
 }
 
 export async function installStatus(): Promise<{
@@ -51,7 +52,7 @@ export async function installStatus(): Promise<{
   try {
     installed = await hayUsuarios()
   } catch (err) {
-    detail = `No se pudo consultar Supabase Auth: ${describe(err)}`
+    detail = `No se pudo consultar el equipo en Supabase: ${describe(err)}`
   }
   return { dbReady, pending, installed, auto: canAutoMigrate(), detail }
 }
@@ -82,7 +83,7 @@ installRoute.post('/migrate', async (c) => {
   if (!canAutoMigrate()) {
     return c.json({ error: 'Sin SUPABASE_ACCESS_TOKEN el servidor no puede crear tablas: pegá el SQL' }, 400)
   }
-  if (await hayUsuarios().catch(() => false)) {
+  if (await hayUsuarios()) {
     return c.json({ error: 'Ya instalado: aplicá las actualizaciones desde el panel' }, 409)
   }
   try {
@@ -93,6 +94,15 @@ installRoute.post('/migrate', async (c) => {
   }
 })
 
+// Una sola réplica es un requisito del producto. Dos clics en el asistente
+// no pueden crear usuarios en paralelo mientras termina la primera petición.
+let finishing = false
+installRoute.use('/finish', async (c, next) => {
+  if (finishing) return c.json({ error: 'La instalación está en curso. Esperá y verificá el estado.' }, 409)
+  finishing = true
+  try { await next() } finally { finishing = false }
+})
+
 installRoute.post('/finish', async (c) => {
   let body: Record<string, unknown>
   try {
@@ -100,8 +110,10 @@ installRoute.post('/finish', async (c) => {
   } catch {
     return c.json({ error: 'JSON inválido' }, 400)
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ error: 'JSON inválido' }, 400)
 
   const st = await installStatus()
+  if (st.detail) return c.json({ error: st.detail }, 502)
   if (st.pending.length) {
     return c.json({ error: 'Todavía faltan migraciones. Verificá la base de nuevo.' }, 409)
   }
@@ -130,7 +142,7 @@ installRoute.post('/finish', async (c) => {
     }
   }
 
-  const pack = typeof body.pack === 'string' && body.pack in PACKS ? body.pack : null
+  const pack = typeof body.pack === 'string' && Object.hasOwn(PACKS, body.pack) ? body.pack : null
   if (!pack) return c.json({ error: `Elegí un pack: ${Object.keys(PACKS).join(' / ')}` }, 400)
   const businessName = typeof body.businessName === 'string' ? body.businessName.trim() : ''
   if (!businessName) return c.json({ error: 'Falta el nombre del negocio' }, 400)
@@ -148,43 +160,44 @@ installRoute.post('/finish', async (c) => {
   const currency = typeof body.currency === 'string' && body.currency.trim() ? body.currency.trim() : '$'
 
   const def = PACKS[pack]
+  let createdUserId: string | null = null
   try {
-    // 1. La configuración del pack: una sola fuente, packages/core.
-    await updateConfig({
-      pack,
-      labels: def.labels,
-      order_stages: def.stages,
-      escalation_reasons: def.reasons,
-      business_name: businessName,
-      timezone,
-      currency,
-      install_token: null,
-      installed_at: new Date().toISOString(),
-    })
-
-    // 2. Los módulos que ese pack prende.
-    const prendidos = modulesForPack(pack)
-    const modulesRes = await db()
-      .from('modules')
-      .upsert(
-        MODULES.map((m) => ({ key: m.key, enabled: prendidos.includes(m.key) })),
-        { onConflict: 'key' },
-      )
-    if (modulesRes.error) throw modulesRes.error
-
-    // 3. Catálogo de ejemplo, para que el bot tenga de qué hablar hoy.
-    if (body.seedDemo) {
-      const filas = SEEDS[pack] ?? []
-      if (filas.length) {
-        const seedRes = await db().from('catalog_items').insert(filas)
-        if (seedRes.error) throw seedRes.error
+    // Si el proceso murió después de crear Auth y antes del RPC, el dueño
+    // (ya validado por el token) puede retomar con el mismo correo.
+    const created = await db().auth.admin.createUser({ email, password, email_confirm: true })
+    if (created.error) {
+      if (!['email_exists', 'email_conflict', 'user_already_exists'].includes(created.error.code ?? '')) throw created.error
+      let existingId: string | undefined
+      for (let page = 1; ; page++) {
+        const users = await db().auth.admin.listUsers({ page, perPage: 100 })
+        if (users.error) throw users.error
+        existingId = users.data.users.find((u) => u.email?.toLowerCase() === email)?.id
+        if (existingId || users.data.users.length < 100) break
       }
+      if (!existingId) throw created.error
+      const reset = await db().auth.admin.updateUserById(existingId, { password, email_confirm: true })
+      if (reset.error) throw reset.error
+      createdUserId = existingId
+    } else {
+      createdUserId = created.data.user.id
     }
 
-    // 4. El dueño: usuario en Auth + fila en el equipo.
-    const { error } = await db().auth.admin.createUser({ email, password, email_confirm: true })
-    if (error) throw error
-    await addTeamMember(email, 'owner')
+    const prendidos = modulesForPack(pack)
+    const finished = await db().rpc('finish_installation', {
+      owner_id: createdUserId,
+      settings: {
+        pack,
+        labels: def.labels,
+        order_stages: def.stages,
+        escalation_reasons: def.reasons,
+        business_name: businessName,
+        timezone,
+        currency,
+      },
+      module_rows: MODULES.map((m) => ({ key: m.key, enabled: m.available && prendidos.includes(m.key) })),
+      catalog_rows: body.seedDemo === true ? (SEEDS[pack] ?? []) : [],
+    })
+    if (finished.error) throw finished.error
 
     // 5. Con token: se cierran los registros abiertos. Si falla, no es
     // grave (la base igual no le muestra nada a quien no es del equipo),
@@ -199,6 +212,9 @@ installRoute.post('/finish', async (c) => {
     forgetSettings()
     return c.json({ ok: true, signupsCerrados })
   } catch (err) {
+    // No borrar Auth acá: un timeout puede ocurrir DESPUÉS del commit del
+    // RPC. Conservarlo permite verificar el estado y reintentar sin dejar
+    // una membresía apuntando a un usuario que ya no existe.
     return c.json({ error: describe(err) }, 502)
   }
 })

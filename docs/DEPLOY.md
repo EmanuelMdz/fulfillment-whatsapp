@@ -1,7 +1,9 @@
 # Poner el sistema en línea
 
 Dos cuentas y un chip: **Supabase** (la base y el login) y **Railway** (el
-servidor y el puente de WhatsApp). Veinte minutos, sin terminal.
+servidor y el puente de WhatsApp). Primero creá tu copia del repo siguiendo
+[PRIMEROS_PASOS.md](PRIMEROS_PASOS.md). Reservá tiempo para configurar y probar:
+abrir el panel no significa que el bot esté listo para clientes.
 
 Railway es lo recomendado. Render sirve igual; lo único que cambia es que su
 plan gratuito duerme el servicio, y un servicio dormido no manda seguimientos
@@ -12,6 +14,8 @@ ni se da cuenta de que el número se desconectó.
 ## 1. Supabase — la base
 
 1. https://supabase.com → **New project**. Elegí la región más cercana.
+   Usá un proyecto nuevo y dedicado. En **Authentication → Sign In / Providers**,
+   desactivá **Allow new users to sign up** antes de continuar.
 2. **Settings → API** → copiá la **Project URL**.
 3. Arriba a la derecha, tu avatar → **Account → Access Tokens → Generate new
    token**. Ponele un nombre ("bot") y copiá el token: empieza con `sbp_` y
@@ -19,12 +23,18 @@ ni se da cuenta de que el número se desconectó.
 
    Con ese token el servidor hace el resto: busca las claves del proyecto,
    crea las tablas y apaga los registros abiertos. Y te sirve después para
-   que tu Claude siga mejorando el sistema contra tu misma base.
+   que tu herramienta de IA siga mejorando el sistema contra tu misma base.
+   Es un token de cuenta, con alcance mayor que este proyecto. Guardalo solo
+   en Variables del servidor o en `.env`; nunca en GitHub ni capturas.
+   El modo manual de abajo permite operar con claves de un solo proyecto.
 
 ## 2. Railway — el servidor
 
 1. https://railway.app → **New Project → Deploy from GitHub repo** → tu fork
    de este repo. Detecta que es Node y usa `railway.json`.
+   La raíz del servicio es la **raíz del repo**, no `apps/bot`. Usa Node 24,
+   instala con `npm ci` y compila bot y panel. Conservá una sola réplica y
+   desactivá la opción de suspender el servicio por inactividad.
 2. Pestaña **Variables → Raw Editor** → pegá esto con tus dos valores:
 
    ```
@@ -40,6 +50,8 @@ ni se da cuenta de que el número se desconectó.
 4. Abrí la URL. Las tablas ya se crearon al arrancar; el asistente te pide
    el pack, el nombre del negocio, tu usuario, y los últimos 8 caracteres del
    token (para confirmar que sos vos). Listo: entrás al panel.
+   Empieza en **modo prueba**, sin números autorizados. Ya podés configurar
+   Studio, Catálogo y Probar el bot antes de crear WAHA.
 
 ## 3. Railway — el puente de WhatsApp (WAHA)
 
@@ -54,32 +66,41 @@ El puente es el servicio que maneja la sesión de WhatsApp Web. Va en el
    WAHA_DASHBOARD_USERNAME=admin
    WAHA_DASHBOARD_PASSWORD=inventá-otra
    WHATSAPP_DEFAULT_ENGINE=WEBJS
+   WAHA_PRINT_QR=False
    ```
 
 3. **Settings → Volumes → Add Volume** → mount path `/app/.sessions`.
    **Sin esto, cada redeploy del puente pide escanear el QR de nuevo.**
 4. **Settings → Networking → Generate Domain**. Cuando pregunte el puerto:
    **3000**.
+   Este servicio usa la imagen Docker; no lleva `npm start`, el build del
+   repo ni las variables de Supabase. Guardá la versión y el digest de WAHA
+   que pruebes y fijá ese digest después de validar: la imagen sin etiqueta
+   puede cambiar entre instalaciones.
 
 ## 4. Conectar
 
 1. Panel → **Conexión**: pegá la URL del puente y la clave
    (`WHATSAPP_API_KEY`). Tocá **Probar conexión**.
+   En **Modo prueba**, cargá el número de OTRO teléfono que usarás como cliente
+   y guardá. Mantené el modo prueba prendido.
 2. **Arrancar la sesión** → escaneá el QR con el número **DEDICADO** del
    negocio (WhatsApp → Dispositivos vinculados → Vincular dispositivo).
-3. Panel → **Studio**: pegá la clave de Gemini (gratis en
-   https://aistudio.google.com/apikey). Tocá **Probar clave y modelo**.
+3. Panel → **Studio**: cargá tu clave de IA y tocá **Probar clave y modelo**.
+   Para Gemini: https://aistudio.google.com/apikey. Una clave no asegura cuota
+   gratis ni acceso a todos los modelos; verificá la cuenta y la facturación.
 4. Panel → **Studio**: elegí el grupo de avisos del equipo (aparece la lista
    de grupos del número conectado).
-5. Panel → **Probar el bot**: charlá. Después mandate un WhatsApp desde otro
-   teléfono. Si contesta, terminaste.
+5. Probá tu prompt y catálogo en **Probar el bot**. Después seguí
+   [PRUEBAS.md](PRUEBAS.md) con teléfonos reales. Quitá los ejemplos y apagá
+   el modo prueba cuando todas las verificaciones estén completas.
 
 ---
 
-## Si preferís no darle el token de tu cuenta
+## Modo manual sin token de cuenta
 
 Cargá en Railway, en vez del token, las dos claves del proyecto
-(Settings → API):
+(Settings → API Keys, claves legacy `anon` y `service_role`):
 
 ```
 SUPABASE_URL=https://TU_PROYECTO.supabase.co
@@ -89,8 +110,10 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 Con eso el servidor no puede crear tablas: el asistente te muestra el SQL y
 lo pegás vos en Supabase → SQL Editor → Run (un solo paste, y otro por cada
-actualización que traiga migraciones). Y apagá a mano **Authentication →
-Sign In / Providers → "Allow new users to sign up"**.
+actualización que traiga migraciones). Quitá o dejá vacío `SUPABASE_ACCESS_TOKEN`:
+si existe, el servidor intentará usarlo para administrar la base. Desactivá
+**Allow new users to sign up** antes de pegar el SQL. La `service_role` es privada;
+la `anon` es la clave pública que usa el panel.
 
 ---
 
@@ -108,8 +131,11 @@ Railway cobra por uso; el plan Hobby incluye cinco dólares de uso por mes.
 | Supabase | gratis para empezar |
 | Gemini | centavos por conversación |
 
-Contá **entre diez y quince dólares por mes por instalación** y decilo antes
-de vender, no después.
+Estos valores son una **estimación inicial**, no una medición ni un precio
+cerrado del repo. Medí tu instalación y definí quién paga. Railway Hobby cuesta
+USD 5/mes e incluye USD 5 de recursos; el exceso se suma según consumo.
+[Planes de Railway](https://docs.railway.com/pricing/plans).
+Consultá también la [tarifa de IA](https://ai.google.dev/gemini-api/docs/pricing).
 
 ### Una sola réplica, siempre
 
@@ -126,9 +152,10 @@ funciona en un servicio que se duerme ni en funciones serverless.
 ### Supabase gratis se pausa
 
 El plan gratuito de Supabase **pausa el proyecto después de una semana sin
-actividad**. Un bot con tráfico nunca llega a eso; una instalación de prueba
-sí. Se despierta desde el panel de Supabase. Y no tiene respaldos
-automáticos: eso es del plan Pro.
+actividad**. Una instalación de aprendizaje puede pausarse; se reactiva desde
+el panel de Supabase. Los planes de pago tienen otro régimen de respaldos.
+Consultá [pausas](https://supabase.com/docs/guides/platform/free-project-pausing)
+y [respaldos](https://supabase.com/docs/guides/platform/backups).
 
 ### Actualizar
 
@@ -136,7 +163,9 @@ Cada push a `main` redespliega solo. Si la actualización trae cambios en la
 base, el servidor los aplica al arrancar (con el token). Si por algo quedó
 algo pendiente, el panel muestra una franja *"Hay cambios pendientes en la
 base de datos"* con el botón **Aplicar**. Si algo sale mal, Railway guarda
-los despliegues anteriores y se vuelve atrás desde la pestaña Deployments.
+los despliegues anteriores y permite volver al código anterior desde Deployments.
+**Eso no revierte las migraciones de Supabase.** Seguí [OPERACION.md](OPERACION.md)
+antes de actualizar una instalación con datos reales.
 
 ### Respaldos
 

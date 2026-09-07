@@ -2,7 +2,13 @@ node_modules/
 dist/
 apps/bot/public/
 .env
-.env.local
+.env.*
+!.env.example
+.codebase-memory/
+coverage/
+test-results/
+backups/
+instalar.sql
 *.log
 .DS_Store
 .vscode/

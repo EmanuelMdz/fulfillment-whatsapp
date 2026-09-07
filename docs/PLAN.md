@@ -1,7 +1,8 @@
 # Plan
 
-Versión navegable, con tablas y estado:
-https://claude.ai/code/artifact/ad83a4e0-62cd-47ab-96a4-b0afbe4aaa80
+> Plan histórico de desarrollo. El alcance disponible está en README.md y
+> los pendientes de la primera release en LANZAMIENTO.md. No hace falta
+> acceder a documentos privados para instalar el producto.
 
 ---
 

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import clsx from 'clsx'
 import { MODULES } from '@fw/core'
-import { Save, Plus, Trash2, ChevronUp, ChevronDown, KeyRound, UserPlus } from 'lucide-react'
+import { ChevronDown, ChevronUp, KeyRound, Plus, Save, Trash2, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { api } from '../lib/api.js'
+import { Avatar, Badge, Button, Card, Field, Input, Notice, PageHeader, Select } from '../ui'
 
 /**
  * Ajustes: lo que hace que el mismo repo se sienta nativo en una tienda
@@ -74,10 +76,10 @@ export default function Ajustes() {
       .then(({ data }) => setModulos(data ?? []))
   }, [])
 
-  function avisar(texto, esError = false) {
+  const avisar = useCallback((texto, esError = false) => {
     setAviso({ texto, esError })
     setTimeout(() => setAviso(null), 4000)
-  }
+  }, [])
 
   // ── Módulos ────────────────────────────────────────────────
   // Se guarda al toque, sin botón: es un interruptor, y un interruptor
@@ -112,10 +114,7 @@ export default function Ajustes() {
       .update({ labels: config.labels ?? {} })
       .eq('id', 1)
     setGuardando(null)
-    avisar(
-      error ? `No se pudo guardar: ${error.message}` : 'Diccionario guardado.',
-      Boolean(error),
-    )
+    avisar(error ? `No se pudo guardar: ${error.message}` : 'Diccionario guardado.', Boolean(error))
   }
 
   async function guardarLista(campo, valores, nombre) {
@@ -161,7 +160,7 @@ export default function Ajustes() {
     }
   }
 
-  if (!config) return <p className="muted">Cargando…</p>
+  if (!config) return <p className="text-[13.5px] text-ink-3">Cargando…</p>
 
   const estados = config.order_stages ?? []
   const motivos = config.escalation_reasons ?? []
@@ -170,156 +169,161 @@ export default function Ajustes() {
 
   return (
     <>
-      <h1 className="page-title">Ajustes</h1>
-      <p className="page-sub">Los módulos que corren, las palabras del negocio, los tiempos del bot y quién entra.</p>
-      {aviso && <p className={aviso.esError ? 'error-text' : 'ok-text'}>{aviso.texto}</p>}
+      <PageHeader title="Ajustes" subtitle="Los módulos que corren, las palabras del negocio, los tiempos del bot y quién entra." />
+      {aviso && (
+        <Notice tone={aviso.esError ? 'error' : 'ok'} className="mb-4">
+          {aviso.texto}
+        </Notice>
+      )}
 
-      {/* ── Módulos ─────────────────────────────────────────── */}
-      <div className="card">
-        <h2>Módulos</h2>
-        <p className="muted">
-          Un módulo apagado no corre, no aparece en el menú y no pide claves. Prenderlo y
-          apagarlo es seguro: no se pierde nada de lo que ya está cargado. Los que dicen
-          "próximamente" todavía no tienen código: se habilitan a medida que llegan.
-        </p>
-        <div className="modulos">
-          {MODULES.map((m) => (
-            <label className={`modulo ${m.available ? '' : 'off'}`} key={m.key}>
-              <input
-                type="checkbox"
-                checked={m.available && prendido(m.key)}
-                disabled={!m.available}
-                onChange={(e) => alternarModulo(m.key, e.target.checked)}
-              />
-              <span className="modulo-nombre">
-                {m.label} {!m.available && <span className="chip">próximamente</span>}
-              </span>
-              <span className="modulo-detalle">{m.description}</span>
-            </label>
-          ))}
+      <div className="grid gap-5">
+        {/* ── Módulos ─────────────────────────────────────────── */}
+        <Card
+          title="Módulos"
+          subtitle='Un módulo apagado no corre, no aparece en el menú y no pide claves. Prenderlo y apagarlo es seguro. Los que dicen "próximamente" todavía no tienen código.'
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {MODULES.map((m) => (
+              <label
+                key={m.key}
+                className={clsx(
+                  'flex items-start gap-3 rounded-xl border border-line px-4 py-3 transition-colors',
+                  m.available ? 'cursor-pointer hover:bg-surface-2' : 'opacity-60',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-[3px] h-4 w-4 shrink-0 accent-brand"
+                  checked={m.available && prendido(m.key)}
+                  disabled={!m.available}
+                  onChange={(e) => alternarModulo(m.key, e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                    {m.label} {!m.available && <Badge>próximamente</Badge>}
+                  </span>
+                  <span className="block text-[12.5px] text-ink-3">{m.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </Card>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          {/* ── Diccionario ─────────────────────────────────────── */}
+          <Card
+            title="Diccionario"
+            subtitle="Cómo se llama cada cosa en este negocio. El panel entero usa estas palabras: en una clínica no hay ventas, hay consultas."
+          >
+            <div className="grid gap-3">
+              {CAMPOS_DICCIONARIO.map((campo) => (
+                <Field key={campo.key} label={`${campo.label} — ej. ${campo.ejemplo}`}>
+                  <Input
+                    value={labels[campo.key] ?? ''}
+                    onChange={(e) => editarConfig('labels', { ...labels, [campo.key]: e.target.value })}
+                  />
+                </Field>
+              ))}
+              <div>
+                <Button variant="primary" icon={Save} onClick={guardarDiccionario} disabled={guardando === 'labels'}>
+                  {guardando === 'labels' ? 'Guardando…' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* ── Avanzado ────────────────────────────────────────── */}
+          <Card title="Avanzado" subtitle="Los tiempos del bot. Los valores de fábrica salieron de producción: cambialos sabiendo por qué.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="Espera antes de contestar (segundos)"
+                hint="Junta los mensajes sueltos del cliente; bajarla hace que el bot conteste tres veces seguidas."
+              >
+                <Input
+                  type="number"
+                  min={5}
+                  max={600}
+                  value={config.debounce_seconds ?? 90}
+                  onChange={(e) => editarConfig('debounce_seconds', Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Moneda" hint="Lo que se muestra al lado de los precios.">
+                <Input value={config.currency ?? '$'} onChange={(e) => editarConfig('currency', e.target.value)} />
+              </Field>
+              <Field label="Pausa mínima entre envíos (ms)" hint="Es lo que protege al número: no bajar de 2000.">
+                <Input
+                  type="number"
+                  min={1000}
+                  max={60000}
+                  step={500}
+                  value={config.send_pause_min_ms ?? 2000}
+                  onChange={(e) => editarConfig('send_pause_min_ms', Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Pausa máxima entre envíos (ms)">
+                <Input
+                  type="number"
+                  min={1000}
+                  max={60000}
+                  step={500}
+                  value={config.send_pause_max_ms ?? 6000}
+                  onChange={(e) => editarConfig('send_pause_max_ms', Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Ventana nocturna: desde (hora local)" hint="A partir de esta hora no salen seguimientos.">
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={config.quiet_hours_start ?? 23}
+                  onChange={(e) => editarConfig('quiet_hours_start', Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Ventana nocturna: hasta">
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={config.quiet_hours_end ?? 9}
+                  onChange={(e) => editarConfig('quiet_hours_end', Number(e.target.value))}
+                />
+              </Field>
+            </div>
+            <div className="mt-4">
+              <Button variant="primary" icon={Save} onClick={guardarAvanzado} disabled={guardando === 'avanzado'}>
+                {guardando === 'avanzado' ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </div>
+          </Card>
         </div>
-      </div>
 
-      {/* ── Diccionario ─────────────────────────────────────── */}
-      <div className="card">
-        <h2>Diccionario</h2>
-        <p className="muted">
-          Cómo se llama cada cosa en este negocio. El panel entero usa estas palabras: en una
-          clínica no hay ventas, hay consultas.
-        </p>
-        {CAMPOS_DICCIONARIO.map((campo) => (
-          <label className="field" key={campo.key}>
-            <span>
-              {campo.label} — ej. {campo.ejemplo}
-            </span>
-            <input
-              value={labels[campo.key] ?? ''}
-              onChange={(e) => editarConfig('labels', { ...labels, [campo.key]: e.target.value })}
-            />
-          </label>
-        ))}
-        <button className="btn primary" onClick={guardarDiccionario} disabled={guardando === 'labels'}>
-          <Save size={15} /> {guardando === 'labels' ? 'Guardando…' : 'Guardar'}
-        </button>
-      </div>
+        <div className="grid gap-5 xl:grid-cols-2">
+          {/* ── Estados del pedido ──────────────────────────────── */}
+          <ListaEditable
+            titulo={`Estados de ${labels.order_plural?.toLowerCase() ?? 'los pedidos'}`}
+            ayuda="El camino que recorre un pedido. El primero es donde nace cuando lo anota el bot; los finales son los que lo sacan de la bandeja."
+            valores={estados}
+            conFinal
+            guardando={guardando === 'order_stages'}
+            onAntesDeBorrar={puedeBorrarEstado}
+            onCambio={(v) => editarConfig('order_stages', v)}
+            onGuardar={(v) => guardarLista('order_stages', v, 'Estados')}
+          />
 
-      {/* ── Estados del pedido ──────────────────────────────── */}
-      <ListaEditable
-        titulo={`Estados de ${labels.order_plural?.toLowerCase() ?? 'los pedidos'}`}
-        ayuda="El camino que recorre un pedido. El primero es donde nace cuando lo anota el bot; los finales son los que lo sacan de la bandeja."
-        valores={estados}
-        conFinal
-        guardando={guardando === 'order_stages'}
-        onAntesDeBorrar={puedeBorrarEstado}
-        onCambio={(v) => editarConfig('order_stages', v)}
-        onGuardar={(v) => guardarLista('order_stages', v, 'Estados')}
-      />
-
-      {/* ── Motivos de derivación ───────────────────────────── */}
-      <ListaEditable
-        titulo="Motivos de derivación"
-        ayuda="Por qué la IA le pasa un chat a una persona. Estos son los que el bot puede elegir: si no está en la lista, no lo puede usar."
-        valores={motivos}
-        guardando={guardando === 'escalation_reasons'}
-        onCambio={(v) => editarConfig('escalation_reasons', v)}
-        onGuardar={(v) => guardarLista('escalation_reasons', v, 'Motivos')}
-      />
-
-      {/* ── Avanzado ────────────────────────────────────────── */}
-      <div className="card">
-        <h2>Avanzado</h2>
-        <p className="muted">
-          Los tiempos del bot. Los valores de fábrica salieron de producción: cambialos sabiendo
-          por qué.
-        </p>
-        <div className="grid-2">
-          <label className="field">
-            <span>Espera antes de contestar, en segundos. Junta los mensajes sueltos del cliente; bajarla hace que el bot conteste tres veces seguidas.</span>
-            <input
-              type="number"
-              min={5}
-              max={600}
-              value={config.debounce_seconds ?? 90}
-              onChange={(e) => editarConfig('debounce_seconds', Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Moneda: lo que se muestra al lado de los precios</span>
-            <input
-              value={config.currency ?? '$'}
-              onChange={(e) => editarConfig('currency', e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>Pausa mínima entre envíos, en milisegundos. Es lo que protege al número: no bajar de 2000.</span>
-            <input
-              type="number"
-              min={1000}
-              max={60000}
-              step={500}
-              value={config.send_pause_min_ms ?? 2000}
-              onChange={(e) => editarConfig('send_pause_min_ms', Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Pausa máxima entre envíos, en milisegundos</span>
-            <input
-              type="number"
-              min={1000}
-              max={60000}
-              step={500}
-              value={config.send_pause_max_ms ?? 6000}
-              onChange={(e) => editarConfig('send_pause_max_ms', Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Ventana nocturna: desde qué hora no salen seguimientos (hora local)</span>
-            <input
-              type="number"
-              min={0}
-              max={23}
-              value={config.quiet_hours_start ?? 23}
-              onChange={(e) => editarConfig('quiet_hours_start', Number(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>Ventana nocturna: hasta qué hora</span>
-            <input
-              type="number"
-              min={0}
-              max={23}
-              value={config.quiet_hours_end ?? 9}
-              onChange={(e) => editarConfig('quiet_hours_end', Number(e.target.value))}
-            />
-          </label>
+          {/* ── Motivos de derivación ───────────────────────────── */}
+          <ListaEditable
+            titulo="Motivos de derivación"
+            ayuda="Por qué la IA le pasa un chat a una persona. Estos son los que el bot puede elegir: si no está en la lista, no lo puede usar."
+            valores={motivos}
+            guardando={guardando === 'escalation_reasons'}
+            onCambio={(v) => editarConfig('escalation_reasons', v)}
+            onGuardar={(v) => guardarLista('escalation_reasons', v, 'Motivos')}
+          />
         </div>
-        <button className="btn primary" onClick={guardarAvanzado} disabled={guardando === 'avanzado'}>
-          <Save size={15} /> {guardando === 'avanzado' ? 'Guardando…' : 'Guardar'}
-        </button>
-      </div>
 
-      {/* ── Usuarios ────────────────────────────────────────── */}
-      <Usuarios avisar={avisar} />
+        {/* ── Usuarios ────────────────────────────────────────── */}
+        <Usuarios avisar={avisar} />
+      </div>
     </>
   )
 }
@@ -331,16 +335,7 @@ export default function Ajustes() {
  * de la lista es donde nace. Por eso hay flechas y no un ordenamiento
  * alfabético.
  */
-function ListaEditable({
-  titulo,
-  ayuda,
-  valores,
-  conFinal = false,
-  guardando,
-  onCambio,
-  onGuardar,
-  onAntesDeBorrar,
-}) {
+function ListaEditable({ titulo, ayuda, valores, conFinal = false, guardando, onCambio, onGuardar, onAntesDeBorrar }) {
   const [nuevo, setNuevo] = useState('')
 
   function agregar() {
@@ -367,15 +362,12 @@ function ListaEditable({
   }
 
   return (
-    <div className="card">
-      <h2>{titulo}</h2>
-      <p className="muted">{ayuda}</p>
-
-      <ul className="lista-editable">
+    <Card title={titulo} subtitle={ayuda}>
+      <ul className="divide-y divide-line">
         {valores.map((v, i) => (
-          <li key={v.key}>
-            <input
-              className="lista-label"
+          <li key={v.key} className="flex flex-wrap items-center gap-2 py-2.5">
+            <Input
+              className="min-w-[160px] flex-1"
               value={v.label}
               onChange={(e) => {
                 const copia = [...valores]
@@ -383,13 +375,20 @@ function ListaEditable({
                 onCambio(copia)
               }}
             />
-            <code className="lista-clave" title="La clave guardada en la base. No se edita.">
+            <code
+              className="rounded-md bg-surface-2 px-2 py-1 font-mono text-[11.5px] text-ink-3"
+              title="La clave guardada en la base. No se edita."
+            >
               {v.key}
             </code>
             {conFinal && (
-              <label className="lista-final" title="Un estado final saca al pedido de la bandeja">
+              <label
+                className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-ink-2"
+                title="Un estado final saca al pedido de la bandeja"
+              >
                 <input
                   type="checkbox"
+                  className="h-4 w-4 accent-brand"
                   checked={Boolean(v.final)}
                   onChange={(e) => {
                     const copia = [...valores]
@@ -397,45 +396,44 @@ function ListaEditable({
                     onCambio(copia)
                   }}
                 />
-                <span>Final</span>
+                Final
               </label>
             )}
-            <div className="lista-acciones">
-              <button className="btn small" onClick={() => mover(i, -1)} disabled={i === 0} title="Subir">
-                <ChevronUp size={14} />
-              </button>
-              <button
-                className="btn small"
+            <div className="flex gap-1">
+              <Button size="icon" variant="ghost" icon={ChevronUp} onClick={() => mover(i, -1)} disabled={i === 0} title="Subir" />
+              <Button
+                size="icon"
+                variant="ghost"
+                icon={ChevronDown}
                 onClick={() => mover(i, 1)}
                 disabled={i === valores.length - 1}
                 title="Bajar"
-              >
-                <ChevronDown size={14} />
-              </button>
-              <button className="btn small danger" onClick={() => borrar(i)} title="Borrar">
-                <Trash2 size={14} />
-              </button>
+              />
+              <Button size="icon" variant="ghost" icon={Trash2} className="text-danger" onClick={() => borrar(i)} title="Borrar" />
             </div>
           </li>
         ))}
       </ul>
 
-      <div className="lista-alta">
-        <input
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Input
+          className="min-w-[160px] flex-1"
           value={nuevo}
           placeholder="Agregar uno nuevo"
           onChange={(e) => setNuevo(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && agregar()}
         />
-        <button className="btn" onClick={agregar}>
-          <Plus size={15} /> Agregar
-        </button>
+        <Button icon={Plus} onClick={agregar}>
+          Agregar
+        </Button>
       </div>
 
-      <button className="btn primary" onClick={() => onGuardar(valores)} disabled={guardando}>
-        <Save size={15} /> {guardando ? 'Guardando…' : 'Guardar'}
-      </button>
-    </div>
+      <div className="mt-4">
+        <Button variant="primary" icon={Save} onClick={() => onGuardar(valores)} disabled={guardando}>
+          {guardando ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </div>
+    </Card>
   )
 }
 
@@ -446,7 +444,8 @@ function ListaEditable({
 function Usuarios({ avisar }) {
   const [usuarios, setUsuarios] = useState([])
   const [yo, setYo] = useState('')
-  const [alta, setAlta] = useState({ email: '', password: '' })
+  const [alta, setAlta] = useState({ email: '', password: '', role: 'member' })
+  const [canManage, setCanManage] = useState(false)
   const [cambiando, setCambiando] = useState(null) // id del usuario al que se le cambia la contraseña
   const [nuevaClave, setNuevaClave] = useState('')
   const [trabajando, setTrabajando] = useState(false)
@@ -456,6 +455,7 @@ function Usuarios({ avisar }) {
       const r = await api('/users')
       setUsuarios(r.users ?? [])
       setYo(r.me ?? '')
+      setCanManage(Boolean(r.canManage))
     } catch (err) {
       avisar(`No se pudieron listar los usuarios: ${err.message}`, true)
     }
@@ -471,7 +471,7 @@ function Usuarios({ avisar }) {
     try {
       const r = await api('/users', alta)
       avisar(r.existia ? 'Ese usuario ya existía: ahora es del equipo.' : 'Usuario creado.')
-      setAlta({ email: '', password: '' })
+      setAlta({ email: '', password: '', role: 'member' })
       cargar()
     } catch (err) {
       avisar(err.message, true)
@@ -506,64 +506,64 @@ function Usuarios({ avisar }) {
   }
 
   return (
-    <div className="card">
-      <h2>Usuarios</h2>
-      <p className="muted">
-        Quién puede entrar a este panel. Todos ven todo: es el equipo de un negocio.
-      </p>
-      <ul className="usuarios" style={{ listStyle: 'none', padding: 0, margin: '0 0 14px' }}>
+    <Card title="Usuarios" subtitle="Quién puede entrar a este panel. Todos ven todo: es el equipo de un negocio.">
+      <ul className="divide-y divide-line">
         {usuarios.map((u) => (
-          <li key={u.id}>
-            <span className="email">
-              {u.email}
-              {u.email === yo ? ' (vos)' : ''}{' '}
-              {u.role === 'owner' && <span className="chip bot">dueño</span>}
-              {!u.role && <span className="chip review">fuera del equipo</span>}
+          <li key={u.id} className="flex flex-wrap items-center gap-3 py-3">
+            <Avatar email={u.email} size={34} />
+            <span className="min-w-[180px] flex-1 text-[13.5px]">
+              <span className="font-semibold text-ink">{u.email}</span>
+              {u.email === yo && <span className="text-ink-3"> (vos)</span>}{' '}
+              {u.role === 'owner' && <Badge tone="green">dueño</Badge>}
+              {!u.role && <Badge tone="yellow">fuera del equipo</Badge>}
             </span>
-            {cambiando === u.id ? (
-              <>
-                <input
+            {canManage && (cambiando === u.id ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
                   type="password"
+                  className="w-56"
                   placeholder="Nueva contraseña (mínimo 8)"
                   value={nuevaClave}
                   onChange={(e) => setNuevaClave(e.target.value)}
                   autoComplete="new-password"
                 />
-                <button className="btn small primary" onClick={() => cambiarClave(u.id)} disabled={trabajando || nuevaClave.length < 8}>
+                <Button size="sm" variant="primary" onClick={() => cambiarClave(u.id)} disabled={trabajando || nuevaClave.length < 8}>
                   Cambiar
-                </button>
-                <button className="btn small" onClick={() => setCambiando(null)}>Cancelar</button>
-              </>
+                </Button>
+                <Button size="sm" onClick={() => setCambiando(null)}>
+                  Cancelar
+                </Button>
+              </div>
             ) : (
-              <>
-                <button className="btn small" onClick={() => setCambiando(u.id)}>
-                  <KeyRound size={14} /> Contraseña
-                </button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" icon={KeyRound} onClick={() => setCambiando(u.id)}>
+                  Contraseña
+                </Button>
                 {u.email !== yo && (
-                  <button className="btn small danger" onClick={() => borrar(u)}>
-                    <Trash2 size={14} /> Borrar
-                  </button>
+                  <Button size="sm" variant="danger" icon={Trash2} onClick={() => borrar(u)}>
+                    Borrar
+                  </Button>
                 )}
-              </>
-            )}
+              </div>
+            ))}
           </li>
         ))}
       </ul>
-      <form onSubmit={crear}>
-        <div className="grid-2">
-          <label className="field">
-            <span>Email de la persona nueva</span>
-            <input
+
+      {!canManage && <Notice className="mt-4">Solo el dueño puede agregar usuarios o cambiar contraseñas.</Notice>}
+      {canManage && <form onSubmit={crear} className="mt-4 grid gap-3 border-t border-line pt-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Email de la persona nueva">
+            <Input
               type="email"
               value={alta.email}
               onChange={(e) => setAlta({ ...alta, email: e.target.value })}
               autoComplete="off"
               required
             />
-          </label>
-          <label className="field">
-            <span>Contraseña inicial (mínimo 8; después la cambia)</span>
-            <input
+          </Field>
+          <Field label="Contraseña inicial (mínimo 8)">
+            <Input
               type="password"
               value={alta.password}
               onChange={(e) => setAlta({ ...alta, password: e.target.value })}
@@ -571,12 +571,20 @@ function Usuarios({ avisar }) {
               minLength={8}
               required
             />
-          </label>
+          </Field>
         </div>
-        <button className="btn primary" type="submit" disabled={trabajando}>
-          <UserPlus size={15} /> {trabajando ? 'Un momento…' : 'Sumar al equipo'}
-        </button>
-      </form>
-    </div>
+        <Field label="Permisos">
+          <Select value={alta.role} onChange={(e) => setAlta({ ...alta, role: e.target.value })}>
+            <option value="member">Miembro: atiende y configura el negocio</option>
+            <option value="owner">Dueño: también administra usuarios y actualizaciones</option>
+          </Select>
+        </Field>
+        <div>
+          <Button variant="primary" type="submit" icon={UserPlus} disabled={trabajando}>
+            {trabajando ? 'Un momento…' : 'Sumar al equipo'}
+          </Button>
+        </div>
+      </form>}
+    </Card>
   )
 }

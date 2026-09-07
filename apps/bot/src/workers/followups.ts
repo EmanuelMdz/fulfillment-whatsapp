@@ -1,4 +1,5 @@
 import { getSettings, TICK_MS } from '../config/settings.js'
+import { botPuedeResponder } from '../config/test-mode.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { isNightAt } from '../agents/followup.js'
@@ -35,7 +36,7 @@ const EVENTOS_DIAS = 90
 let corriendo = false
 let ultimaLimpieza = 0
 
-async function despachar(fu: Followup): Promise<void> {
+async function despachar(fu: Followup, config: Awaited<ReturnType<typeof getConfig>>): Promise<void> {
   if (Date.now() - new Date(fu.scheduled_at).getTime() > OVERDUE_MS) {
     await markFollowupStatus(fu.id, 'cancelled')
     logEvent({
@@ -56,6 +57,18 @@ async function despachar(fu: Followup): Promise<void> {
       eventType: 'followup.dropped',
       conversationId: fu.conversation_id,
       payload: { motivo: 'sin_bot', estado: conv?.state ?? 'sin_conversacion' },
+    })
+    return
+  }
+
+  // Modo prueba: un recordatorio agendado antes de prenderlo no puede
+  // salir hacia un número que ya no está autorizado.
+  if (!botPuedeResponder(config, conv.chat_id)) {
+    await markFollowupStatus(fu.id, 'cancelled')
+    logEvent({
+      eventType: 'followup.dropped',
+      conversationId: fu.conversation_id,
+      payload: { motivo: 'modo_prueba' },
     })
     return
   }
@@ -97,7 +110,7 @@ async function tick(): Promise<void> {
     const vencidos = await claimDueFollowups(5)
     for (const fu of vencidos) {
       try {
-        await despachar(fu)
+        await despachar(fu, config)
       } catch (error) {
         console.error('[seguimiento] falló:', describe(error))
         await markFollowupStatus(fu.id, 'failed').catch(() => {})

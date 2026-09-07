@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { loadEnv } from '../config/env.js'
 import { disableSignups, runSql } from '../config/supabase-admin.js'
 import { appliedMigrations } from './queries.js'
+import { MIGRATION_REGISTRY_SQL, migrationSql } from '@fw/core'
 
 /**
  * Las migraciones: qué falta y cómo aplicarlas.
@@ -26,8 +27,7 @@ export const MIGRATIONS_DIR = join(
   'packages', 'db', 'migrations',
 )
 
-const CREATE_REGISTRO =
-  'create table if not exists public._migrations (name text primary key, applied_at timestamptz not null default now());'
+const CREATE_REGISTRO = MIGRATION_REGISTRY_SQL
 
 export function migrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR)
@@ -65,8 +65,7 @@ export function sqlBundle(pending: string[]): string {
   ]
   for (const file of pending) {
     partes.push(`-- >>> ${file}`)
-    partes.push(readMigration(file))
-    partes.push(`insert into public._migrations (name) values ('${file}') on conflict do nothing;`)
+    partes.push(migrationSql(file, readMigration(file)))
   }
   return partes.join('\n\n')
 }
@@ -86,11 +85,10 @@ export async function applyPendingMigrations(): Promise<string[]> {
   await runSql(ref, accessToken, CREATE_REGISTRO)
   for (const file of pending) {
     try {
-      await runSql(ref, accessToken, readMigration(file))
+      await runSql(ref, accessToken, migrationSql(file, readMigration(file)))
     } catch (err) {
       throw new Error(`La migración ${file} falló: ${err instanceof Error ? err.message : String(err)}`)
     }
-    await runSql(ref, accessToken, `insert into public._migrations (name) values ('${file}') on conflict do nothing;`)
   }
   // PostgREST (la API que usa el servidor) cachea el esquema: sin esto,
   // las tablas recién creadas tardan unos segundos en "existir" para él.

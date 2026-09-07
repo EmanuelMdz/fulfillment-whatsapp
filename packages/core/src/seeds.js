@@ -8,6 +8,41 @@
  * (no hay conexión directa a Postgres).
  */
 export const SEEDS = {
+  // Para el pack General: un producto, un servicio y un extra, para que
+  // se vea que el catálogo mezcla lo que haga falta.
+  general: [
+    {
+      name: 'Remera básica',
+      kind: 'product',
+      price: 990,
+      description: 'Algodón peinado, talles S a XXL.',
+      bot_info:
+        'Viene en blanco, negro y gris. Talles del S al XXL: si preguntan cuál les queda, pedir altura y peso y sugerir. Se lava a máquina en frío. Cambio sin cargo dentro de los 30 días con la prenda sin uso.',
+      sort: 1,
+      track_stock: true,
+      stock_qty: 20,
+    },
+    {
+      name: 'Gorra bordada',
+      kind: 'product',
+      price: 690,
+      description: 'Talle único, ajustable.',
+      bot_info: 'Talle único con regulador atrás. Bordado al frente, no estampado: no se descascara. Colores: negro y beige.',
+      sort: 2,
+      track_stock: true,
+      stock_qty: 15,
+    },
+    {
+      name: 'Envío a domicilio',
+      kind: 'service',
+      price: 250,
+      description: 'Dentro de la ciudad, 24 a 48 horas.',
+      bot_info:
+        'Se entrega en 24 a 48 horas hábiles dentro de la ciudad. Fuera de la ciudad se cotiza aparte: pedir la localidad y derivar. Se coordina la franja horaria por este mismo chat el día del envío.',
+      sort: 3,
+    },
+  ],
+
   ecommerce: [
     {
       name: 'Auriculares inalámbricos',

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare } from 'lucide-react'
+import { ClipboardList, MessageSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { Badge, Button, Card, EmptyState, Notice, PageHeader, Select, Table } from '../ui'
 
 /**
  * Los pedidos — ventas en una tienda, consultas en una clínica. El
@@ -68,61 +69,103 @@ export default function Pedidos() {
     return items.map((i) => `${i.qty ?? 1}× ${i.name ?? '?'}`).join(' · ')
   }
 
+  const columnas = [
+    {
+      key: 'contacto',
+      label: 'Contacto',
+      render: (p) => (
+        <div>
+          <span className="font-semibold text-ink">{p.contacts?.name?.trim() || p.contacts?.phone || 'Sin contacto'}</span>
+          {p.source === 'bot' && (
+            <Badge tone="green" className="ml-2">
+              lo armó el bot
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'detalle',
+      label: 'Detalle',
+      render: (p) => (
+        <div className="text-ink-2">
+          <span>{renderItems(p.items)}</span>
+          {p.notes && <span className="block text-[12.5px] text-ink-3">Nota: {p.notes}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      align: 'right',
+      render: (p) => (
+        <span className="font-semibold tabular-nums text-ink">
+          {moneda}
+          {p.total}
+        </span>
+      ),
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (p) => <span className="text-ink-2">{new Date(p.created_at).toLocaleDateString('es-UY')}</span>,
+    },
+    {
+      key: 'etapa',
+      label: 'Etapa',
+      render: (p) => (
+        <Select
+          className="h-8 w-auto min-w-36 py-1 text-[13px]"
+          value={p.stage}
+          onChange={(e) => cambiarEtapa(p, e.target.value)}
+        >
+          {etapas.map((e) => (
+            <option key={e.key} value={e.key}>
+              {e.label}
+            </option>
+          ))}
+          {!etapas.some((e) => e.key === p.stage) && <option value={p.stage}>{p.stage}</option>}
+        </Select>
+      ),
+    },
+    {
+      key: 'acciones',
+      label: '',
+      align: 'right',
+      render: (p) =>
+        p.contact_id ? (
+          <Button size="sm" icon={MessageSquare} onClick={() => abrirChat(p)}>
+            Abrir chat
+          </Button>
+        ) : null,
+    },
+  ]
+
   return (
     <>
-      <h1 className="page-title">{nombrePlural}</h1>
-      <p className="page-sub">
-        Los que armó el bot llegan en la primera etapa, esperando que alguien los confirme.
-      </p>
-      {error && <p className="error-text">{error}</p>}
+      <PageHeader
+        title={nombrePlural}
+        subtitle="Los que armó el bot llegan en la primera etapa, esperando que alguien los confirme."
+        actions={
+          <>
+            <Button size="sm" variant={soloAbiertos ? 'dark' : 'default'} onClick={() => setSoloAbiertos(true)}>
+              Abiertos
+            </Button>
+            <Button size="sm" variant={!soloAbiertos ? 'dark' : 'default'} onClick={() => setSoloAbiertos(false)}>
+              Todos
+            </Button>
+          </>
+        }
+      />
+      {error && <Notice tone="error" className="mb-4">{error}</Notice>}
 
-      <div style={{ marginBottom: 10, display: 'flex', gap: 8 }}>
-        <button className={`btn small ${soloAbiertos ? 'primary' : ''}`} onClick={() => setSoloAbiertos(true)}>
-          Abiertos
-        </button>
-        <button className={`btn small ${!soloAbiertos ? 'primary' : ''}`} onClick={() => setSoloAbiertos(false)}>
-          Todos
-        </button>
-      </div>
-
-      <div className="card">
-        {visibles.length === 0 && <p className="muted">Nada por acá todavía.</p>}
-        {visibles.map((p) => (
-          <div className="inbox-item" key={p.id}>
-            <div className="body">
-              <div className="title">
-                {p.contacts?.name?.trim() || p.contacts?.phone || 'Sin contacto'}
-                {'  '}
-                <span className="muted" style={{ fontWeight: 400 }}>
-                  · {moneda}{p.total} · {new Date(p.created_at).toLocaleDateString('es-UY')}
-                  {p.source === 'bot' ? ' · lo armó el bot' : ''}
-                </span>
-              </div>
-              <p className="detail">{renderItems(p.items)}</p>
-              {p.notes && <p className="detail">Nota: {p.notes}</p>}
-            </div>
-            <div className="actions">
-              <select
-                className="btn small"
-                value={p.stage}
-                onChange={(e) => cambiarEtapa(p, e.target.value)}
-              >
-                {etapas.map((e) => (
-                  <option key={e.key} value={e.key}>{e.label}</option>
-                ))}
-                {!etapas.some((e) => e.key === p.stage) && (
-                  <option value={p.stage}>{p.stage}</option>
-                )}
-              </select>
-              {p.contact_id && (
-                <button className="btn small" onClick={() => abrirChat(p)}>
-                  <MessageSquare size={15} /> Abrir chat
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <Card>
+        {visibles.length === 0 ? (
+          <EmptyState icon={ClipboardList} title="Nada por acá todavía" text="Cuando el bot anote uno, aparece acá." />
+        ) : (
+          <Table columns={columnas} rows={visibles} />
+        )}
+      </Card>
     </>
   )
 }

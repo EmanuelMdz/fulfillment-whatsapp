@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "npm run dev --workspace=apps/bot",
@@ -17,8 +17,17 @@
     "build": "npm run build --workspace=apps/panel && npm run build --workspace=apps/bot",
     "start": "npm run start --workspace=apps/bot",
     "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "test": "node --import ./tests/bootstrap.mjs --import tsx --test --test-concurrency=1 tests/*.test.mjs",
     "db:sql": "node scripts/db-sql.mjs",
+    "demo": "node scripts/demo.mjs",
+    "demo:limpiar": "node scripts/demo.mjs limpiar",
+    "prompt:push": "node scripts/prompt.mjs push",
+    "prompt:pull": "node scripts/prompt.mjs pull",
     "type-check": "npm run type-check --workspace=apps/bot",
-    "check": "npm run type-check && npm run build"
+    "check": "npm test && npm run type-check && npm run build"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   }
 }

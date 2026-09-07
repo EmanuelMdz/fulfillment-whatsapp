@@ -22,6 +22,10 @@ healthRoute.get('/', async (c) => {
       version: VERSION,
       timezone: s.config.timezone,
       whatsapp: hasWhatsapp(s) ? 'configurado' : 'sin configurar',
+      // Lo que vio el vigilante la última vez (ver workers/session-watch.ts).
+      // 'WORKING' es el único que significa "el bot está atendiendo".
+      session: s.config.whatsapp_status ?? null,
+      session_at: s.config.whatsapp_status_at ?? null,
       llm: hasLlm(s) ? 'configurado' : 'sin clave',
       public_url: s.publicUrl || null,
     })

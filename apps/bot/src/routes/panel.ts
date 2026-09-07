@@ -13,7 +13,7 @@ import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
 import { buildTurnContext } from '../agents/context.js'
 import { parseTurnDecision } from '../agents/decision.js'
-import { decideFollowups } from '../agents/followup.js'
+import { buildFollowupSystem, decideFollowups } from '../agents/followup.js'
 import { chat, type Turn } from '../agents/llm.js'
 import { db } from '../db/client.js'
 import { applyPendingMigrations, canAutoMigrate } from '../db/migrate.js'
@@ -53,6 +53,20 @@ import {
  * Todas las rutas exigen un usuario del equipo (ver middleware/auth.ts).
  */
 export const panelRoute = new Hono<PanelEnv>()
+
+// Ser miembro permite atender. Administrar identidades o cambiar claves
+// de otras personas requiere ser dueño, aunque se invoque la API a mano.
+const requireOwner: import('hono').MiddlewareHandler<PanelEnv> = async (c, next) => {
+  if (c.req.method === 'GET' && c.req.path.endsWith('/users')) { await next(); return }
+  const team = await listTeamMembers()
+  if (!team.some((m) => m.email === c.get('userEmail') && m.role === 'owner')) {
+    return c.json({ error: 'Solo el dueño puede administrar usuarios y actualizaciones' }, 403)
+  }
+  await next()
+}
+panelRoute.use('/users', requireOwner)
+panelRoute.use('/users/*', requireOwner)
+panelRoute.use('/migrate', requireOwner)
 
 async function leerJson<T extends object>(c: Context): Promise<T | null> {
   try {
@@ -97,6 +111,9 @@ panelRoute.post('/reply', async (c) => {
 
   const conversacion = await getConversationById(conversationId)
   if (!conversacion) return c.json({ error: 'Conversación no encontrada' }, 404)
+  if (conversacion.chat_id.startsWith('demo:')) {
+    return c.json({ error: 'Este chat es de demostración. Usá Probar el bot para conversar sin enviar mensajes.' }, 409)
+  }
 
   await enqueueSend({
     conversationId: conversacion.id,
@@ -200,11 +217,16 @@ panelRoute.post('/test-chat', async (c) => {
   }
 })
 
-// Lo que el modelo lee antes de contestar, tal cual: nombre, prompts,
-// fecha, catálogo con ids, motivos. Es la forma de entender por qué
-// contestó lo que contestó.
+// Lo que el modelo lee antes de contestar, tal cual: nombre, prompt,
+// fecha, catálogo con ids, motivos, formato. Es la forma de entender por
+// qué contestó lo que contestó. Con `?agente=seguimientos`, lo que lee
+// el agente de recordatorios.
 panelRoute.get('/test-context', async (c) => {
   try {
+    if (c.req.query('agente') === 'seguimientos') {
+      const config = await getConfig()
+      return c.json({ system: await buildFollowupSystem('whatsapp', config) })
+    }
     const { system } = await buildTurnContext('whatsapp')
     return c.json({ system })
   } catch (err) {
@@ -366,8 +388,25 @@ panelRoute.post('/settings', async (c) => {
         patch[key] = typeof v === 'string' && v.trim() ? v.trim() : null
         break
       case 'bot_enabled':
+      case 'test_mode':
         patch[key] = Boolean(v)
         break
+      case 'test_numbers': {
+        // Del panel viene una línea por número (o separados por comas).
+        // Se guardan como los escribió el dueño; la comparación normaliza
+        // después (ver config/test-mode.ts).
+        const crudos = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[\n,;]+/) : null
+        if (!crudos) {
+          errores.push('los números de prueba tienen que venir como texto o lista')
+          break
+        }
+        const limpios = crudos
+          .map((n) => String(n).trim())
+          .filter(Boolean)
+          .filter((n) => n.replace(/\D+/g, '').length >= 8)
+        patch[key] = [...new Set(limpios)]
+        break
+      }
       case 'timezone':
         if (typeof v !== 'string' || !esZonaValida(v)) errores.push('zona horaria inválida')
         else patch[key] = v
@@ -406,6 +445,12 @@ panelRoute.post('/settings', async (c) => {
     patch.send_pause_max_ms < patch.send_pause_min_ms
   ) {
     errores.push('la pausa máxima tiene que ser mayor o igual que la mínima')
+  }
+  // Prender el modo prueba sin números deja al bot mudo con TODOS: es lo
+  // que dice hacer, pero casi nunca es lo que se quiso.
+  if (patch.test_mode === true) {
+    const numeros = patch.test_numbers ?? (await getConfig()).test_numbers
+    if (!numeros?.length) errores.push('cargá al menos un número de prueba antes de prender el modo prueba')
   }
   if (errores.length) return c.json({ error: errores.join('; ') }, 400)
   if (!Object.keys(patch).length) return c.json({ error: 'Nada para guardar' }, 400)
@@ -459,7 +504,7 @@ panelRoute.get('/users', async (c) => {
       last_sign_in_at: u.last_sign_in_at ?? null,
       created_at: u.created_at,
     }))
-  return c.json({ users, me: c.get('userEmail') })
+  return c.json({ users, me: c.get('userEmail'), canManage: roles.get(c.get('userEmail')) === 'owner' })
 })
 
 panelRoute.post('/users', async (c) => {
@@ -471,6 +516,10 @@ panelRoute.post('/users', async (c) => {
   if (!EMAIL_RE.test(email)) return c.json({ error: 'Email inválido' }, 400)
   if (password.length < 8) return c.json({ error: 'La contraseña tiene que tener al menos 8 caracteres' }, 400)
 
+  const existing = (await listTeamMembers()).find((m) => m.email === email)
+  if (existing?.role === 'owner' && role !== 'owner') {
+    return c.json({ error: 'Este usuario ya es dueño. No se puede quitar su rol desde el alta.' }, 409)
+  }
   const { error } = await db().auth.admin.createUser({ email, password, email_confirm: true })
   // Si el usuario ya existía en Auth pero no era del equipo, sumarlo al
   // equipo es exactamente lo que se pidió.

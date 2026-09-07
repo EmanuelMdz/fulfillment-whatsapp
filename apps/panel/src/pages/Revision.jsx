@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Bot, Check, MessageSquare } from 'lucide-react'
+import { Bot, Check, Inbox, MessageSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { api } from '../lib/api.js'
+import { Badge, Button, Card, EmptyState, Notice, PageHeader } from '../ui'
 
 /**
  * La bandeja del equipo: todo chat que necesita una persona cae acá —
@@ -12,6 +12,15 @@ import { api } from '../lib/api.js'
  * "Resuelto" cierra el caso sin tocar el chat; "Devolver al bot" además
  * lo destraba (y despierta el turno si quedó un mensaje sin responder).
  */
+
+// Los motivos de sistema (los ponen las guardas del código, no el pack).
+const SISTEMA = {
+  loop_detectado: 'El bot quedó en loop',
+  respuesta_vacia: 'El modelo no devolvió respuesta',
+  repeticion: 'El bot iba a repetirse',
+  pedido_nuevo: 'Pedido para confirmar',
+}
+
 export default function Revision() {
   const [casos, setCasos] = useState([])
   const [conversaciones, setConversaciones] = useState({})
@@ -56,14 +65,6 @@ export default function Revision() {
     return () => clearInterval(t)
   }, [cargar])
 
-  // Los motivos de sistema (los ponen las guardas del código, no el pack).
-  const SISTEMA = {
-    loop_detectado: 'El bot quedó en loop',
-    respuesta_vacia: 'El modelo no devolvió respuesta',
-    repeticion: 'El bot iba a repetirse',
-    pedido_nuevo: 'Pedido para confirmar',
-  }
-
   async function resolver(caso) {
     setError(null)
     const { error } = await supabase
@@ -86,44 +87,54 @@ export default function Revision() {
 
   return (
     <>
-      <h1 className="page-title">Revisión</h1>
-      <p className="page-sub">Los chats que están esperando a una persona.</p>
-      {error && <p className="error-text">{error}</p>}
+      <PageHeader
+        title="Revisión"
+        subtitle="Los chats que están esperando a una persona."
+        actions={cargado && casos.length > 0 && <Badge tone="yellow">{casos.length} abiertos</Badge>}
+      />
+      {error && <Notice tone="error" className="mb-4">{error}</Notice>}
 
-      <div className="card">
-        {cargado && casos.length === 0 && <p className="muted">Nada pendiente. Todo atendido.</p>}
-        {casos.map((caso) => {
-          const conv = conversaciones[caso.conversation_id]
-          const quien = conv
-            ? conv.contact_name?.trim() || conv.contact_phone || conv.chat_id?.split('@')[0]
-            : '…'
-          return (
-            <div className="inbox-item" key={caso.id}>
-              <div className="body">
-                <div className="title">{quien}</div>
-                <span className="chip review">
-                  {motivos[caso.reason] ?? SISTEMA[caso.reason] ?? caso.reason}
-                </span>
-                {caso.detail && <p className="detail">{caso.detail}</p>}
-                {conv?.last_message && (
-                  <p className="detail">Último mensaje: {conv.last_message}</p>
-                )}
-              </div>
-              <div className="actions">
-                <Link className="btn small" to={`/?chat=${caso.conversation_id}`}>
-                  <MessageSquare size={15} /> Abrir chat
-                </Link>
-                <button className="btn small" onClick={() => devolver(caso)}>
-                  <Bot size={15} /> Devolver al bot
-                </button>
-                <button className="btn small" onClick={() => resolver(caso)}>
-                  <Check size={15} /> Resuelto
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <Card padded={false} bodyClassName="py-1">
+        {cargado && casos.length === 0 && (
+          <EmptyState icon={Inbox} title="Nada pendiente" text="Todo atendido. Los casos nuevos aparecen acá solos." />
+        )}
+        <ul className="divide-y divide-line">
+          {casos.map((caso) => {
+            const conv = conversaciones[caso.conversation_id]
+            const quien = conv
+              ? conv.contact_name?.trim() || conv.contact_phone || conv.chat_id?.split('@')[0]
+              : '…'
+            const esSistema = caso.reason in SISTEMA
+            return (
+              <li key={caso.id} className="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[14px] font-semibold text-ink">{quien}</span>
+                    <Badge tone={caso.reason === 'pedido_nuevo' ? 'green' : esSistema ? 'red' : 'yellow'}>
+                      {motivos[caso.reason] ?? SISTEMA[caso.reason] ?? caso.reason}
+                    </Badge>
+                  </div>
+                  {caso.detail && <p className="mt-1.5 text-[13px] whitespace-pre-wrap text-ink-2">{caso.detail}</p>}
+                  {conv?.last_message && (
+                    <p className="mt-1 truncate text-[12.5px] text-ink-3">Último mensaje: {conv.last_message}</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button size="sm" icon={MessageSquare} to={`/?chat=${caso.conversation_id}`}>
+                    Abrir chat
+                  </Button>
+                  <Button size="sm" icon={Bot} onClick={() => devolver(caso)}>
+                    Devolver al bot
+                  </Button>
+                  <Button size="sm" variant="primary" icon={Check} onClick={() => resolver(caso)}>
+                    Resuelto
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
     </>
   )
 }

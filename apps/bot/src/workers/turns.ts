@@ -1,5 +1,6 @@
 import { getSettings, hasLlm, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
+import { botPuedeResponder } from '../config/test-mode.js'
 import { logEvent } from '../observability/events.js'
 import { notifyOrderPending, notifyReview, notifyTurnFailed } from '../notifications/notify.js'
 import { buildTurnContext } from '../agents/context.js'
@@ -12,7 +13,7 @@ import {
   claimDueTurns,
   enqueueSend,
   getConfig,
-  getPrompts,
+  getConversationById,
   history,
   lastInboundId,
   lastInboundPreview,
@@ -49,11 +50,11 @@ let corriendo = false
 let avisoApagado = false
 let avisoSinClave = false
 
-// Piso por si el prompt se borró desde el panel. Los textos de verdad
-// viven en la tabla `prompts` (secciones mensaje_puente y
-// mensaje_pedido_anotado) y se editan desde Studio.
-const PUENTE_POR_DEFECTO = 'Dame un momentito que lo reviso y te escribo 🙌'
-const PEDIDO_ANOTADO_POR_DEFECTO = 'Dale! Ya quedó anotado, apenas el equipo lo confirme te aviso por acá 🙌'
+// La red de seguridad cuando el modelo no devolvió nada: antes que el
+// silencio, una línea neutra, y el chat pasa a una persona. No es voz
+// del negocio (por eso no está en el panel): es el código cubriendo una
+// falla.
+const LINEA_PUENTE = 'Dame un momento que lo reviso y te escribo.'
 
 /**
  * Lo que el modelo lee por cada mensaje del hilo. Un mensaje sin texto
@@ -98,6 +99,7 @@ async function escalar(
 }
 
 async function responder(conversacion: Conversation): Promise<void> {
+  if (!botPuedeResponder(await getConfig(), conversacion.chat_id)) return
   // ¿Sigue siendo el último mensaje el que disparó este turno?
   //
   // Si el cliente siguió escribiendo mientras esperábamos, este turno ya
@@ -158,6 +160,13 @@ async function responder(conversacion: Conversation): Promise<void> {
   }))
 
   const crudo = await chat(system, turnos)
+  // El modelo tarda: mientras tanto pudieron apagar el bot, tomar el
+  // chat o llegar otro mensaje. No usar la foto anterior a la llamada.
+  const [actual, configActual, ultimoActual] = await Promise.all([
+    getConversationById(conversacion.id), getConfig(), lastInboundId(conversacion.id),
+  ])
+  if (!actual || actual.state !== 'bot' || !configActual.bot_enabled ||
+      !botPuedeResponder(configActual, actual.chat_id) || ultimoActual !== ultimo) return
   const decision = parseTurnDecision(
     crudo,
     (config.escalation_reasons ?? []).map((r) => r.key),
@@ -167,12 +176,11 @@ async function responder(conversacion: Conversation): Promise<void> {
   // puente — y el chat a revisión para que lo levante una persona.
   if (!decision.messages.length) {
     console.warn(`[turno] el modelo no devolvió nada para ${conversacion.chat_id}`)
-    const prompts = await getPrompts(conversacion.channel)
     await enqueueSend({
       conversationId: conversacion.id,
       channel: conversacion.channel,
       chatId: conversacion.chat_id,
-      body: prompts.mensaje_puente?.trim() || PUENTE_POR_DEFECTO,
+      body: LINEA_PUENTE,
     })
     await escalar(
       conversacion,
@@ -227,21 +235,13 @@ async function responder(conversacion: Conversation): Promise<void> {
   }
 
   // El cliente confirmó un pedido. El bot lo ANOTA — no lo cierra: el
-  // pedido nace en la primera etapa, el cliente recibe un "quedó
-  // anotado" honesto y el equipo lo confirma desde el panel. Si además
-  // el modelo pidió derivar, el pedido manda: ya deriva por sí mismo.
+  // pedido nace en la primera etapa, el cliente ya recibió (en los
+  // mensajes del modelo, con la voz del negocio) un "quedó anotado"
+  // honesto, y el equipo lo confirma desde el panel. Si además el modelo
+  // pidió derivar, el pedido manda: ya deriva por sí mismo.
   if (decision.order) {
     try {
       const resultado = await createOrderFromChat(conversacion, decision.order, config)
-      // Sin promesa de tiempo a propósito: "en un ratito" con una
-      // aprobación que tarda horas es un cliente reclamando a las 18hs.
-      const prompts = await getPrompts(conversacion.channel)
-      await enqueueSend({
-        conversationId: conversacion.id,
-        channel: conversacion.channel,
-        chatId: conversacion.chat_id,
-        body: prompts.mensaje_pedido_anotado?.trim() || PEDIDO_ANOTADO_POR_DEFECTO,
-      })
       await pauseForHuman(conversacion.id)
       await cancelPendingFollowups(conversacion.id)
       const detalle = resultado.ok ? resultado.summary : (resultado.problem ?? '')

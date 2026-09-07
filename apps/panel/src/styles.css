@@ -1,395 +1,130 @@
-/* ============================================================
-   Panel — una sola hoja, variables arriba.
+@import 'tailwindcss';
 
-   Regla del repo: mobile 100%, sin scroll lateral. Todo lo que es
-   tabla en escritorio se vuelve tarjeta en el teléfono, y el chat
-   navega como WhatsApp: lista → hilo a pantalla completa.
-   ============================================================ */
+/*
+ * El sistema de diseño del panel, en un solo lugar.
+ *
+ * Todo lo visual sale de estos tokens: los componentes de src/ui/ los
+ * usan por nombre (bg-surface, text-ink-2, rounded-card, shadow-card…)
+ * y las páginas usan los componentes. Para cambiar el look del panel
+ * entero se toca este archivo; para agregar una pantalla se combinan
+ * componentes. Nada de colores sueltos en las páginas.
+ *
+ * La referencia: barra lateral oscura, fondo gris claro, tarjetas
+ * blancas redondeadas con sombra suave, verde como único acento, y
+ * pastillas de color suave para los estados.
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-:root {
-  --bg: #f4f5f7;
-  --panel: #ffffff;
-  --border: #e3e6ea;
-  --text: #1c2530;
-  --muted: #68727e;
-  --accent: #0f766e;
-  --accent-soft: #e6f2f0;
-  --danger: #b3382c;
-  --warn-soft: #fdf1e3;
-  --warn-text: #92500f;
-  --bubble-in: #ffffff;
-  --bubble-out: #d8efe8;
-  --bubble-human: #e8e4f8;
-  --radius: 10px;
-  --sidebar-w: 220px;
+  /* Texto */
+  --color-ink: #16181d;
+  --color-ink-2: #5b6472;
+  --color-ink-3: #8c95a3;
+
+  /* Superficies */
+  --color-page: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f8fa;
+  --color-line: #e7e9ee;
+
+  /* Barra lateral */
+  --color-side: #1c1d21;
+  --color-side-2: #2b2c32;
+  --color-side-ink: #c9cdd6;
+  --color-side-line: #33343b;
+
+  /* El acento: verde. Uno solo, y es el de WhatsApp — el producto vive
+     adentro de WhatsApp, así que el panel se siente parte de eso sin
+     tener que estampar un logo en cada pantalla. */
+  --color-brand: #25d366;
+  --color-brand-2: #128c7e; /* el verde oscuro de la marca: hover y texto */
+  --color-brand-soft: #dcfce7;
+  /* La burbuja del que manda, igual que en WhatsApp. El espejo del chat
+     tiene que leerse como el chat. */
+  --color-bubble-out: #d9fdd3;
+
+  /* Semánticos, para estados y pastillas. No son el acento. */
+  --color-info: #4f7be8;
+  --color-info-soft: #e5edff;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fff4cc;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-violet: #7c5ce6;
+  --color-violet-soft: #ece7ff;
+  --color-orange: #e8843c;
+  --color-orange-soft: #ffebdd;
+
+  /* Formas */
+  --radius-card: 16px;
+  --radius-ctl: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 20px rgba(16, 24, 40, 0.05);
+  --shadow-pop: 0 12px 32px rgba(16, 24, 40, 0.12);
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body {
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-}
-#root { min-height: 100vh; }
-
-button { font: inherit; cursor: pointer; }
-input, textarea, select { font: inherit; color: inherit; }
-
-/* ── Estructura ──────────────────────────────────────────── */
-.shell { display: flex; min-height: 100vh; }
-.sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: #10201d;
-  color: #d7e2df;
-  display: flex;
-  flex-direction: column;
-  padding: 14px 10px;
-  gap: 2px;
-}
-.sidebar .brand {
-  font-weight: 700;
-  color: #fff;
-  padding: 8px 10px 14px;
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sidebar a {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  color: inherit;
-  text-decoration: none;
-  font-weight: 500;
-}
-.sidebar a.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
-.sidebar a:hover { background: rgba(255, 255, 255, 0.07); }
-.sidebar .spacer { flex: 1; }
-.sidebar .logout {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  background: none;
-  border: 0;
-  color: #b9c6c2;
-  border-radius: 8px;
-  text-align: left;
-}
-.sidebar .logout:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
-
-.content { flex: 1; min-width: 0; padding: 18px; }
-.page-title { margin: 0 0 4px; font-size: 19px; }
-.page-sub { margin: 0 0 16px; color: var(--muted); }
-
-/* ── Tarjetas y formularios ──────────────────────────────── */
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 14px;
-}
-.card h2 { margin: 0 0 10px; font-size: 15px; }
-.field { display: block; margin-bottom: 12px; }
-.field span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
-.field input, .field textarea, .field select {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fff;
-}
-.field textarea { min-height: 110px; resize: vertical; }
-.check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 8px;
-  padding: 8px 13px;
-  font-weight: 600;
-}
-.btn:hover { border-color: #c8cdd3; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { filter: brightness(1.08); }
-.btn.danger { color: var(--danger); }
-.btn:disabled { opacity: 0.55; cursor: default; }
-.btn.small { padding: 5px 10px; font-size: 13px; }
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 99px;
-  padding: 2.5px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  background: #eef0f2;
-  color: var(--muted);
-}
-.chip.bot { background: var(--accent-soft); color: var(--accent); }
-.chip.humano { background: var(--bubble-human); color: #4c3d99; }
-.chip.cerrado { background: #eef0f2; color: var(--muted); }
-.chip.review { background: var(--warn-soft); color: var(--warn-text); }
-
-.error-text { color: var(--danger); }
-.muted { color: var(--muted); }
-.ok-text { color: var(--accent); }
-
-/* ── Chat ────────────────────────────────────────────────── */
-.chat { display: flex; gap: 0; height: calc(100vh - 36px); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.chat-list { width: 320px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-.chat-list-head { padding: 12px 14px; border-bottom: 1px solid var(--border); font-weight: 700; }
-.chat-list-body { overflow-y: auto; flex: 1; }
-.conv-item {
-  width: 100%;
-  display: block;
-  text-align: left;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  padding: 10px 14px;
-}
-.conv-item:hover { background: #f7f8f9; }
-.conv-item.selected { background: var(--accent-soft); }
-.conv-item .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.conv-item .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conv-item .when { font-size: 11.5px; color: var(--muted); flex-shrink: 0; }
-.conv-item .preview { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
-.conv-item .tags { margin-top: 4px; display: flex; gap: 6px; }
-
-.chat-thread { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #eef1f0; }
-.thread-head {
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.thread-head .who { font-weight: 700; margin-right: auto; }
-.thread-head .back { display: none; }
-.thread-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.bubble {
-  max-width: 72%;
-  border-radius: 12px;
-  padding: 7px 11px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
-}
-.bubble.in { background: var(--bubble-in); align-self: flex-start; border-bottom-left-radius: 4px; }
-.bubble.out { background: var(--bubble-out); align-self: flex-end; border-bottom-right-radius: 4px; }
-.bubble.human { background: var(--bubble-human); }
-.bubble .meta { display: block; font-size: 10.5px; color: var(--muted); margin-top: 3px; text-align: right; }
-.bubble.pendiente { opacity: 0.65; }
-
-.composer { display: flex; gap: 8px; padding: 10px; background: var(--panel); border-top: 1px solid var(--border); }
-.composer textarea {
-  flex: 1;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  resize: none;
-  min-height: 40px;
-  max-height: 120px;
-}
-
-.thread-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); }
-
-/* ── Listas tipo bandeja (Revisión) ──────────────────────── */
-.inbox-item {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 2px;
-  border-bottom: 1px solid var(--border);
-}
-.inbox-item:last-child { border-bottom: 0; }
-.inbox-item .body { flex: 1; min-width: 0; }
-.inbox-item .title { font-weight: 600; }
-.inbox-item .detail { color: var(--muted); font-size: 13px; margin-top: 2px; white-space: pre-wrap; }
-.inbox-item .actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-
-/* ── KPIs ────────────────────────────────────────────────── */
-.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
-.kpi {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-.kpi-valor { font-size: 22px; font-weight: 700; }
-.kpi-titulo { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
-.kpi.alerta { border-color: var(--danger); }
-.kpi.alerta .kpi-valor { color: var(--danger); }
-
-/* ── Ficha del contacto ──────────────────────────────────── */
-.ficha { flex: 1; overflow-y: auto; padding: 16px; background: var(--panel); }
-.ficha dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
-.ficha dt { color: var(--muted); }
-.ficha dd { margin: 0; word-break: break-word; }
-
-/* ── Login ───────────────────────────────────────────────── */
-.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.login-card { width: 100%; max-width: 360px; }
-.login-card h1 { font-size: 19px; margin: 0 0 2px; }
-
-/* ── QR ──────────────────────────────────────────────────── */
-.qr-box { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0; }
-.qr-box img { width: 240px; height: 240px; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-.steps { margin: 0; padding-left: 18px; color: var(--muted); }
-.steps li { margin-bottom: 4px; }
-
-
-/* ── Ajustes: módulos y las tres listas ──────────────── */
-.modulos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 12px; }
-.modulo {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 2px 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.modulo:hover { border-color: #c8cdd3; }
-.modulo-nombre { font-weight: 600; }
-.modulo-detalle { grid-column: 2; color: var(--muted); font-size: 12.5px; }
-
-.lista-editable { list-style: none; margin: 12px 0; padding: 0; }
-.lista-editable li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.lista-editable li:last-child { border-bottom: 0; }
-.lista-label { flex: 1; min-width: 140px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-.lista-clave { color: var(--muted); font-size: 12px; background: var(--bg); padding: 3px 6px; border-radius: 5px; }
-.lista-final { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; }
-.lista-acciones { display: flex; gap: 4px; margin-left: auto; }
-.lista-alta { display: flex; gap: 8px; margin-bottom: 12px; }
-.lista-alta input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-
-/* ── Claves, avisos, avanzado, usuarios, instalador ── */
-.clave-row { display: flex; gap: 8px; }
-.clave-row input { flex: 1; min-width: 0; }
-.chip.ok { background: var(--accent-soft); color: var(--accent); }
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
-  border: 1px solid var(--warn-text);
-  background: var(--warn-soft);
-  color: var(--warn-text);
-  border-radius: 8px;
-  font-size: 13.5px;
-}
-.banner span { flex: 1; }
-.avanzado { margin-top: 12px; }
-.avanzado summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
-.acciones-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; }
-.modulo.off { opacity: 0.6; }
-.contexto {
-  white-space: pre-wrap;
-  font-size: 12.5px;
-  background: #f6f7f9;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  max-height: 320px;
-  overflow: auto;
-  margin: 8px 12px 0;
-}
-.seguimientos-prueba { margin: 8px 0 0; padding: 0; list-style: none; }
-.seguimientos-prueba li {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 6px;
-  font-size: 13.5px;
-  background: #fff;
-}
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.usuarios li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.usuarios li:last-child { border-bottom: 0; }
-.usuarios .email { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
-.usuarios input { flex: 1; min-width: 160px; }
-.instalar-wrap { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; }
-.instalar { width: 100%; max-width: 720px; }
-.instalar h1 { font-size: 20px; margin: 0 0 2px; }
-.pasos { display: flex; gap: 6px; margin: 12px 0 16px; flex-wrap: wrap; }
-.paso { padding: 4px 10px; border-radius: 99px; font-size: 12.5px; background: #eef0f2; color: var(--muted); }
-.paso.activo { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.paso.hecho { background: var(--accent); color: #fff; }
-.sql-box {
-  width: 100%;
-  min-height: 220px;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px;
-  box-sizing: border-box;
-}
-
-/* ── MOBILE (≤760px): sin scroll lateral, chat tipo WhatsApp ── */
-@media (max-width: 760px) {
-  .shell { flex-direction: column; }
-  .sidebar {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
-    padding: 8px 10px;
-    gap: 4px;
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
   }
-  .sidebar .brand { padding: 0 8px; flex-shrink: 0; }
-  .sidebar a { flex-shrink: 0; padding: 7px 9px; }
-  .sidebar a span { display: none; } /* solo el ícono en el teléfono */
-  .sidebar .spacer { display: none; }
-  .sidebar .logout span { display: none; }
-  .content { padding: 10px; }
-  .chat { height: calc(100vh - 130px); }
+  body {
+    @apply bg-page text-ink font-sans text-[14px] leading-[1.5];
+  }
+  /* El foco visible es parte del diseño, no un accidente del navegador. */
+  :where(button, a, input, select, textarea):focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
 
-  /* Lista → hilo a pantalla completa, como WhatsApp. */
-  .chat-list { width: 100%; border-right: 0; }
-  .chat.abierto .chat-list { display: none; }
-  .chat-thread { display: none; }
-  .chat.abierto .chat-thread { display: flex; }
-  .thread-head .back { display: inline-flex; }
-  .bubble { max-width: 86%; }
+@layer components {
+  /* Controles de formulario. Los componentes de src/ui/Field.jsx los usan. */
+  .ctl {
+    @apply w-full rounded-ctl border border-line bg-surface px-3.5 py-2.5 text-[14px] text-ink placeholder:text-ink-3
+      transition-[border-color,box-shadow] duration-150
+      focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15
+      disabled:bg-surface-2 disabled:text-ink-3;
+  }
+  textarea.ctl {
+    @apply min-h-28 resize-y leading-[1.5];
+  }
+  select.ctl {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235b6472' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 12px center;
+  }
 
-  .modulos { grid-template-columns: 1fr; }
-  .lista-editable li { align-items: stretch; }
-  .lista-label { flex-basis: 100%; }
-  .inbox-item { flex-direction: column; }
-  .inbox-item .actions { justify-content: flex-start; }
-  .clave-row { flex-wrap: wrap; }
-  .grid-2 { grid-template-columns: 1fr; }
-  .banner { flex-wrap: wrap; }
-  .thread-head { flex-wrap: wrap; }
+  /* Burbujas del chat. Es la única parte con clases propias: el hilo se
+     lee mejor con nombres de dominio que con veinte utilidades. */
+  .bubble {
+    @apply relative max-w-[72%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-[1.45] whitespace-pre-wrap break-words;
+  }
+  .bubble-in {
+    @apply self-start rounded-bl-md bg-surface-2 text-ink;
+  }
+  .bubble-out {
+    @apply self-end rounded-br-md bg-bubble-out text-ink;
+  }
+  .bubble-human {
+    @apply bg-violet-soft;
+  }
+  .bubble-pending {
+    @apply opacity-60;
+  }
+  .bubble-meta {
+    @apply mt-1 block text-[11px] text-ink-3;
+  }
+}
+
+/* Recharts: el texto de los ejes con la tipografía y el gris del sistema. */
+.recharts-cartesian-axis-tick text {
+  fill: var(--color-ink-3);
+  font-size: 12px;
 }

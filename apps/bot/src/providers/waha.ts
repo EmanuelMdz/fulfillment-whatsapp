@@ -30,6 +30,10 @@ interface WahaEnvelope {
   }
 }
 
+class WahaError extends Error {
+  constructor(readonly status: number, message: string) { super(message) }
+}
+
 export class WahaProvider implements MessageProvider {
   readonly channel = 'whatsapp' as const
 
@@ -45,6 +49,7 @@ export class WahaProvider implements MessageProvider {
     const { apiUrl, apiKey } = await this.cfg()
     if (!apiUrl) throw new Error('Falta la URL del puente de WhatsApp: cargala en el panel, pestaña Conexión')
     const res = await fetch(`${apiUrl}${path}`, {
+      signal: AbortSignal.timeout(20_000),
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -55,7 +60,7 @@ export class WahaProvider implements MessageProvider {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
-      throw new Error(`WAHA ${method} ${path} respondió ${res.status}: ${detail.slice(0, 300)}`)
+      throw new WahaError(res.status, `WAHA ${method} ${path} respondió ${res.status}: ${detail.slice(0, 300)}`)
     }
 
     // Algunos endpoints contestan vacío.
@@ -69,6 +74,7 @@ export class WahaProvider implements MessageProvider {
   }
 
   async sendText(chatId: string, text: string): Promise<{ externalId: string | null }> {
+    if (chatId.startsWith('demo:')) throw new Error('Una conversación de demostración no puede enviar mensajes')
     const { session } = await this.cfg()
     const sent = await this.call<{ id?: string | { _serialized?: string } }>('/api/sendText', {
       session,
@@ -121,13 +127,23 @@ export class WahaProvider implements MessageProvider {
         webhooks: [{ url, events: ['message', 'message.any'] }],
       },
     }
+    const path = `/api/sessions/${encodeURIComponent(session)}`
+    let existing: { config?: Record<string, unknown>; status?: string }
     try {
+      existing = await this.call(path, undefined, 'GET')
+    } catch (err) {
+      if (!(err instanceof WahaError) || err.status !== 404) throw err
       await this.call('/api/sessions', body)
-    } catch {
-      // Ya existía: reiniciarla alcanza (y si el número estaba deslogueado,
-      // vuelve a pedir QR).
-      await this.call(`/api/sessions/${encodeURIComponent(session)}/restart`)
+      return
     }
+    // Reiniciar no actualiza la configuración. Al cambiar de dominio o
+    // túnel, el webhook anterior dejaba de entregar mensajes para siempre.
+    // WAHA pide la configuración completa en PUT; conservamos sus opciones.
+    await this.call(path, {
+      name: session,
+      config: { ...existing.config, ...body.config },
+    }, 'PUT')
+    await this.call(`${path}/${existing.status === 'STOPPED' ? 'start' : 'restart'}`)
   }
 
   /**
@@ -139,7 +155,7 @@ export class WahaProvider implements MessageProvider {
     const { apiUrl, apiKey, session } = await this.cfg()
     const res = await fetch(
       `${apiUrl}/api/${encodeURIComponent(session)}/auth/qr?format=image`,
-      { headers: { 'X-Api-Key': apiKey, Accept: 'image/png' } },
+      { headers: { 'X-Api-Key': apiKey, Accept: 'image/png' }, signal: AbortSignal.timeout(20_000) },
     )
     if (!res.ok) return null
     const buf = Buffer.from(await res.arrayBuffer())

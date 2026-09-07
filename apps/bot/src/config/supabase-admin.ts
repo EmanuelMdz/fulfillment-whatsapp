@@ -17,6 +17,7 @@ const API = 'https://api.supabase.com/v1'
 
 async function mgmt<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API}${path}`, {
+    signal: AbortSignal.timeout(60_000),
     method,
     headers: {
       Authorization: `Bearer ${token}`,

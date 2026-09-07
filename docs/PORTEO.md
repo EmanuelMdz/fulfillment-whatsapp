@@ -1,10 +1,13 @@
 # Porteo
 
+> Contexto histórico de desarrollo. Para instalar usá PRIMEROS_PASOS.md;
+> el estado de la entrega y las funciones disponibles están en README.md.
+
 Lista de trabajo para traer lo que ya funciona en el sistema de origen. Se marca
 a medida que entra.
 
-**Repos de origen** (no se tocan, solo se leen):
-`CascadeProjects/Argos/bot-eccomerce` y `CascadeProjects/Argos/Argos`.
+El sistema de origen es privado y no hace falta para instalar o mantener este
+repo. Todo lo necesario para esta entrega debe estar incluido acá.
 
 **Regla al portear**: se limpia todo rastro del negocio de origen — cadetería,
 DAC, Montevideo, combos, márgenes, atribución de anuncios y los prompts

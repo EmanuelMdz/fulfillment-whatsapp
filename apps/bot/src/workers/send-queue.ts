@@ -1,8 +1,9 @@
 import { getSettings, hasWhatsapp, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
+import { botPuedeResponder } from '../config/test-mode.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
-import { claimNextSend, markFailed, markSent, saveMessage } from '../db/queries.js'
+import { claimNextSend, getConfig, markFailed, markSent, saveMessage } from '../db/queries.js'
 
 /**
  * El carril único de salida.
@@ -65,6 +66,16 @@ async function despachar(): Promise<void> {
       await pausaAlAzar(s.bot.sendPauseMinMs, s.bot.sendPauseMaxMs)
       await provider.stopTyping(pendiente.chat_id).catch(() => {})
 
+      // Se vuelve a mirar después de la pausa: activar modo prueba o
+      // apagar el bot también corta lo que ya estaba encolado. Los avisos
+      // internos y las respuestas humanas siguen su recorrido.
+      const actual = await getConfig()
+      if (pendiente.chat_id.startsWith('demo:') || (pendiente.author === 'bot' && pendiente.conversation_id &&
+          (!actual.bot_enabled || !botPuedeResponder(actual, pendiente.chat_id)))) {
+        await markFailed(pendiente.id, 3, 'Envío cancelado: demo, bot apagado o modo prueba')
+        return
+      }
+
       const { externalId } = await provider.sendText(pendiente.chat_id, pendiente.body)
       await markSent(pendiente.id)
 
@@ -80,6 +91,10 @@ async function despachar(): Promise<void> {
           direction: 'out',
           author: pendiente.author,
           body: pendiente.body,
+        }).catch((err) => {
+          // El mensaje ya salió. Fallar al guardar el espejo no autoriza
+          // reenviarlo al cliente como si hubiese fallado WAHA.
+          console.error('[envío] enviado, pero no se pudo guardar el mensaje:', describe(err))
         })
       }
     } catch (error) {

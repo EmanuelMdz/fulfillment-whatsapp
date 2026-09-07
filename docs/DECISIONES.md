@@ -192,3 +192,48 @@ alcanza con un paste en el editor SQL.
 todavía) y se protegen con una prueba de que quien instala es el dueño: los
 últimos caracteres del token que cargó en el hosting, o el código que viaja
 dentro del SQL que pegó en su base.
+
+---
+
+## 11. Un sistema de diseño, no una hoja de estilos
+
+**Decisión.** El panel usa Tailwind 4 con los tokens en un solo archivo
+(`styles.css`, bloque `@theme`) y una docena de componentes propios en
+`src/ui/` (`Card`, `Button`, `Badge`, `Field`, `Table`, `Kpi`…). Las
+páginas combinan componentes; no escriben colores ni tamaños. Los
+gráficos van con Recharts. La referencia visual: barra lateral oscura,
+fondo gris claro, tarjetas blancas redondeadas, verde como único acento.
+
+**Por qué.** El CSS anterior era una lista de clases por pantalla: cada
+pantalla nueva agregaba las suyas y ninguna se parecía del todo a la
+anterior. Con tokens y componentes, cambiar el look del producto entero es
+tocar un archivo, y un alumno que agrega una pantalla la arma con las
+mismas piezas y le sale igual a las demás.
+
+**Lo que cuesta.** Tailwind y Recharts son dos dependencias más en el
+panel, y el bundle del navegador es más grande (Recharts va en su propio
+archivo, cacheado entre deploys). Y las tablas siguen teniendo que volverse
+tarjetas en el teléfono: el componente `Table` lo hace solo.
+
+---
+
+## 12. Una copia nueva tiene que poder verificarse sin cuentas reales
+
+**Decisión (7 de septiembre de 2026).** Node 24 y lockfile; `npm run check`
+incluye tests con red bloqueada, Postgres en memoria y APIs simuladas. CI
+repite esos controles en Windows y Linux. `npm run doctor` revisa el entorno
+local sin imprimir credenciales ni tocar la base. No se agregan variables de
+negocio al entorno.
+
+Las migraciones comparten un generador entre servidor y terminal: ejecutarlas
+y registrarlas es atómico, con bloqueo y omisión de las ya aplicadas. El
+asistente confirma configuración, catálogo y dueño en un RPC restringido;
+si Auth quedó creado antes de una caída, permite retomar con el mismo correo.
+La recepción de un mensaje y su turno también se guardan en una transacción.
+
+Las instalaciones nuevas empiezan en modo prueba. La demo usa destinos que
+no son teléfonos, una marca explícita para borrar y cero seguimientos activos.
+Administrar usuarios o aplicar migraciones desde el panel requiere ser dueño.
+
+**Límite.** Estas pruebas no reemplazan conectar Supabase y WAHA reales ni
+ejecutar PRUEBAS.md. Los pendientes de publicación están en LANZAMIENTO.md.

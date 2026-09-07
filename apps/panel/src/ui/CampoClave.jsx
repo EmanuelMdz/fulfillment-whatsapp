@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { Save } from 'lucide-react'
+import Badge from './Badge.jsx'
+import Button from './Button.jsx'
+import { Field, Input } from './Field.jsx'
 
 /**
  * Un campo para una clave secreta. Nunca muestra la guardada: solo que
@@ -24,28 +27,28 @@ export default function CampoClave({ etiqueta, ayuda, estado, onGuardar }) {
   }
 
   return (
-    <label className="field">
-      <span>
-        {etiqueta}{' '}
-        {estado?.set ? (
-          <span className="chip ok">cargada {estado.hint}</span>
-        ) : (
-          <span className="chip">sin cargar</span>
-        )}
-        {ayuda ? <span className="muted"> — {ayuda}</span> : null}
-      </span>
-      <div className="clave-row">
-        <input
+    <Field
+      label={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          {etiqueta}
+          {estado?.set ? <Badge tone="green">cargada {estado.hint}</Badge> : <Badge>sin cargar</Badge>}
+        </span>
+      }
+      hint={ayuda}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Input
           type="password"
+          className="min-w-0 flex-1"
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           placeholder={estado?.set ? 'Pegá una nueva para reemplazarla' : 'Pegá la clave'}
           autoComplete="off"
         />
-        <button className="btn primary" onClick={guardar} disabled={guardando || !valor.trim()}>
-          <Save size={15} /> {guardando ? 'Guardando…' : 'Guardar'}
-        </button>
+        <Button variant="primary" icon={Save} onClick={guardar} disabled={guardando || !valor.trim()}>
+          {guardando ? 'Guardando…' : 'Guardar'}
+        </Button>
       </div>
-    </label>
+    </Field>
   )
 }
