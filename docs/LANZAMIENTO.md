@@ -1,3 +1,37 @@
+# Estado de lanzamiento · 8 de septiembre de 2026
+
+## Alcance vigente
+
+Motor de WhatsApp con leads, conversaciones, control humano y seguimientos.
+El objetivo, los links, la información, las etapas y la cadencia viven en el prompt.
+La instalación y el panel iniciales ya no incluyen catálogo, pedidos ni packs.
+
+- El turno ejecuta mensajes, datos y derivación en texto libre.
+- La ficha del lead vuelve como contexto y se actualiza con un merge atómico.
+- Los seguimientos leen la última respuesta y aceptan la cadencia del prompt.
+  Se descartan horas inválidas sin reemplazarlas por horarios inventados.
+- La migración 0016 agrega el registro de seguimientos condicionado a que el
+  turno siga vigente. Conserva tablas históricas y prompts de negocios instalados.
+- Guías, prompt inicial, demo y puesta en marcha siguen el alcance genérico.
+
+## Verificación local de esta revisión
+
+- `npm run check`: tests aislados, TypeScript y build aprobados.
+- SQL: instalación nueva, preservación de una instalación anterior, merge de
+  ficha, cancelación de planes obsoletos y permisos de los RPC verificados en PGlite.
+- `npm audit`: sin vulnerabilidades reportadas.
+- Revisión visual pendiente: no había navegador disponible en esta sesión.
+- No se aplicaron migraciones a cuentas reales ni se enviaron mensajes.
+
+Antes de publicar: ensayar una instalación vacía con Supabase, Railway, el
+modelo de IA elegido y teléfonos reales según PRUEBAS.md; validar WAHA y fijar
+su versión; revisar escritorio/teléfono, licencia y empaquetado de la entrega.
+
+Lo siguiente es registro histórico de la revisión anterior. Sus referencias
+a catálogo, pedidos y packs no describen el alcance vigente.
+
+---
+
 # Estado de lanzamiento · 7 de septiembre de 2026
 
 Documento para el autor. **Preparado para validar la entrega; todavía no

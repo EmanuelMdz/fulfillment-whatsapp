@@ -1,5 +1,21 @@
 # Decisiones
 
+## Alcance vigente · 8 de septiembre de 2026
+
+El producto es un motor de WhatsApp con leads, conversaciones y seguimientos.
+El prompt define objetivo, información, links, datos, etapas y cuándo derivar.
+Se retiran catálogo, pedidos y packs del flujo inicial; su código y datos
+históricos se conservan como referencia para extensiones. Esto reemplaza las
+decisiones de producto anteriores sobre pedidos como núcleo y listas obligatorias.
+
+El código conserva el contrato de acciones y los controles operativos. Los
+seguimientos toman su cadencia del prompt; las horas inválidas se descartan.
+La ficha se fusiona en SQL y el plan se agenda solo si el turno sigue vigente.
+Los prompts de instalaciones existentes se conservan y deben revisarse en Studio.
+
+## Registro histórico
+
+
 Por qué el producto está armado así. Cada una tiene un costo que ya pagamos a
 propósito; cambiarlas después sale caro, así que si alguna se revisa, que sea
 sabiendo qué se rompe.

@@ -26,6 +26,10 @@ test('instalación desde cero, rollback, repetición del SQL y permisos', async 
   assert.equal((await db.query('select count(*)::int as n from public._migrations')).rows[0].n, files.length)
   assert.equal((await db.query('select test_mode from public.app_config')).rows[0].test_mode, true)
 
+  assert.equal((await db.query('select pack from app_config')).rows[0].pack, 'agent')
+  const factory = readFileSync(new URL('../prompts/negocio.md', import.meta.url), 'utf8')
+  assert.equal((await db.query("select content from prompts where section='sistema' and channel is null")).rows[0].content, factory)
+
   const ownerId = '00000000-0000-4000-8000-000000000001'
   await db.query('insert into auth.users values ($1, $2)', [ownerId, 'owner@example.invalid'])
   const settings = { pack: 'general', business_name: 'Demo', timezone: 'UTC', currency: '$',
@@ -39,6 +43,19 @@ test('instalación desde cero, rollback, repetición del SQL y permisos', async 
   await finish(SEEDS.general)
   assert.equal((await db.query('select count(*)::int as n from catalog_items')).rows[0].n, SEEDS.general.length)
   await assert.rejects(finish(SEEDS.general), /ya tiene dueño/)
+
+  // Una actualización conserva el prompt y catálogo de una instalación anterior.
+  await db.exec("update prompts set content = 'Mi prompt personalizado' where section='sistema';")
+  await db.exec(readFileSync(new URL('0016_agente_generico.sql', dir), 'utf8'))
+  assert.equal((await db.query("select content from prompts where section='sistema' and channel is null")).rows[0].content, 'Mi prompt personalizado')
+  assert.equal((await db.query('select count(*)::int as n from catalog_items')).rows[0].n, SEEDS.general.length)
+
+  const lead = (await db.query("insert into contacts(name, collected) values ('', jsonb_build_object('interes', 'Diseño')) returning id")).rows[0].id
+  await db.query('select merge_lead_data($1, $2)', [lead, { nombre_completo: 'Ana', etapa: 'Link compartido' }])
+  await db.query('select merge_lead_data($1, $2)', [lead, { interes: 'Diseño web' }])
+  const profile = (await db.query('select name, collected from contacts where id=$1', [lead])).rows[0]
+  assert.equal(profile.name, 'Ana')
+  assert.deepEqual(profile.collected, { nombre_completo: 'Ana', etapa: 'Link compartido', interes: 'Diseño web' })
 
   // Repegar el SQL no vuelve a importar usuarios ajenos ni pisa el prompt.
   await db.exec("insert into auth.users values (gen_random_uuid(), 'outsider@example.invalid'); update app_config set test_mode = false;")
@@ -66,7 +83,17 @@ test('instalación desde cero, rollback, repetición del SQL y permisos', async 
   assert.ok(due)
   assert.equal((await receive('external-1')).rows[0].inserted, false)
   assert.equal((await db.query('select count(*)::int as n from messages')).rows[0].n, 1)
+  const inbound = (await db.query('select last_inbound_id from conversations where id=$1', [conversationId])).rows[0].last_inbound_id
+  const schedule = (id, when = new Date(Date.now() + 7200000).toISOString()) =>
+    db.query('select schedule_followup_if_current($1,$2,$3,$4) as scheduled', [conversationId, id, 'Seguimiento', when])
+  assert.equal((await schedule(inbound)).rows[0].scheduled, true)
   await receive('external-2', false)
+  assert.equal((await schedule(inbound)).rows[0].scheduled, false)
+  assert.equal((await db.query('select status from followups where conversation_id=$1', [conversationId])).rows[0].status, 'cancelled')
+  const current = (await db.query('select last_inbound_id from conversations where id=$1', [conversationId])).rows[0].last_inbound_id
+  assert.equal((await schedule(current, new Date(Date.now() - 60000).toISOString())).rows[0].scheduled, false)
+  await db.query("update conversations set state='humano' where id=$1", [conversationId])
+  assert.equal((await schedule(current)).rows[0].scheduled, false)
   assert.equal((await db.query('select respond_after from conversations where id=$1', [conversationId])).rows[0].respond_after, null)
 
   await db.exec('grant select on all tables in schema public to authenticated; set role authenticated;')
@@ -74,6 +101,8 @@ test('instalación desde cero, rollback, repetición del SQL y permisos', async 
   assert.equal((await db.query('select * from app_secrets')).rows.length, 0)
   await assert.rejects(db.exec("insert into _migrations (name) values ('fake.sql')"), /permission denied/)
   await assert.rejects(finish([]), /permission denied/)
+  await assert.rejects(db.query('select merge_lead_data($1, $2)', [lead, { etapa: 'No autorizado' }]), /permission denied/)
+  await assert.rejects(schedule(current), /permission denied/)
   await db.exec("select set_config('request.jwt.claims', '{\"email\":\"owner@example.invalid\"}', false)")
   assert.equal((await db.query('select * from catalog_items')).rows.length, SEEDS.general.length)
 })

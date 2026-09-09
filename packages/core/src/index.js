@@ -36,9 +36,7 @@ export const CORE_FEATURES = [
   'Conexión del número por QR',
   'Conversaciones y toma de control humana',
   'Prompts editables',
-  'Contactos',
-  'Catálogo',
-  'Pedidos',
+  'Leads y ficha configurable',
   'Seguimientos automáticos',
   'Cola de revisión',
   'Avisos a un grupo',
@@ -51,6 +49,11 @@ export const CORE_FEATURES = [
  * pedido, y por qué motivos la IA deriva a una persona.
  */
 export const PACKS = {
+  agent: {
+    label: 'Agente', modules: [],
+    labels: { contact: 'Lead', contact_plural: 'Leads' },
+    stages: [], reasons: [],
+  },
   // El punto de partida para cualquier negocio: palabras neutras, un
   // circuito de pedido simple, motivos de derivación que sirven en
   // cualquier rubro. Desde acá el dueño renombra lo que quiera en

@@ -31,6 +31,7 @@ import {
   history,
   lastInboundId,
   listTeamMembers,
+  mergeCollectedData,
   pauseForHuman,
   removeTeamMember,
   resolveOpenReview,
@@ -178,10 +179,28 @@ panelRoute.post('/close', async (c) => {
   return c.json({ ok: true, estado: 'cerrado' })
 })
 
+// La ficha comparte el mismo merge atómico que usa el agente.
+panelRoute.post('/lead-data', async (c) => {
+  const body = await leerJson<{ contact_id?: unknown; data?: unknown }>(c)
+  if (!body || typeof body.contact_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.contact_id) ||
+      !body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
+    return c.json({ error: 'Faltan el lead y sus datos' }, 400)
+  }
+  const entries = Object.entries(body.data)
+  if (entries.some(([key, value]) => !key.trim() || ['__proto__', 'constructor', 'prototype'].includes(key.trim()) || typeof value !== 'string')) {
+    return c.json({ error: 'Los datos deben ser pares de texto' }, 400)
+  }
+  const { data: lead, error } = await db().from('contacts').select('id').eq('id', body.contact_id).maybeSingle()
+  if (error) return c.json({ error: describe(error) }, 502)
+  if (!lead) return c.json({ error: 'Lead no encontrado' }, 404)
+  await mergeCollectedData(body.contact_id, Object.fromEntries(entries.map(([key, value]) => [key.trim(), (value as string).trim()])))
+  return c.json({ ok: true })
+})
+
 // ── Probar el bot sin gastar un número ───────────────────────
 // El mismo contexto y el mismo contrato del turno real, pero sin tocar
 // la base ni WhatsApp: el navegador manda el historial y recibe la
-// DECISIÓN completa — incluidos derivación, datos y pedido — para que
+// DECISIÓN completa — incluidos derivación y datos — para que
 // se vea qué habría hecho el bot de verdad.
 
 function turnosDesde(messages: unknown): Turn[] {
@@ -205,12 +224,9 @@ panelRoute.post('/test-chat', async (c) => {
   if (!turnos.length) return c.json({ error: 'Falta messages: [{role, content}]' }, 400)
 
   try {
-    const { system, config } = await buildTurnContext('whatsapp')
+    const { system } = await buildTurnContext('whatsapp')
     const crudo = await chat(system, turnos)
-    const decision = parseTurnDecision(
-      crudo,
-      (config.escalation_reasons ?? []).map((r) => r.key),
-    )
+    const decision = parseTurnDecision(crudo)
     return c.json({ ok: true, decision, crudo })
   } catch (err) {
     return c.json({ error: describe(err) }, 502)
@@ -218,7 +234,7 @@ panelRoute.post('/test-chat', async (c) => {
 })
 
 // Lo que el modelo lee antes de contestar, tal cual: nombre, prompt,
-// fecha, catálogo con ids, motivos, formato. Es la forma de entender por
+// fecha y formato. Es la forma de entender por
 // qué contestó lo que contestó. Con `?agente=seguimientos`, lo que lee
 // el agente de recordatorios.
 panelRoute.get('/test-context', async (c) => {
@@ -257,7 +273,6 @@ panelRoute.post('/test-followups', async (c) => {
         mensaje: p.message,
         en_horas: Math.round(p.hours * 10) / 10,
         cuando: p.at.toISOString(),
-        fallback: p.fallback,
       })),
     })
   } catch (err) {

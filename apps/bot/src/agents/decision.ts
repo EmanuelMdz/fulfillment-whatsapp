@@ -1,109 +1,43 @@
 import { extractJson } from './parsers.js'
-import { logEvent } from '../observability/events.js'
 
-/**
- * Lo que el modelo decide en un turno. No es solo la respuesta: también
- * si la conversación necesita una persona y qué datos nuevos dio el
- * cliente para la ficha.
- */
+/** Acciones genéricas del motor. El prompt decide cuándo usarlas. */
 export interface TurnDecision {
-  /** Las burbujas a mandar, en orden. */
   messages: string[]
-  /** Clave del motivo de derivación, o null si el bot sigue solo. */
   escalateReason: string | null
-  /** Datos personales nuevos que dio el cliente (nombre, dirección…). */
   data: Record<string, string> | null
-  /** El pedido que el cliente confirmó, o null. Ids del catálogo. */
-  order: { items: Array<{ id: string; qty: number }>; note: string } | null
 }
 
 const MAX_BUBBLES = 3
 
-/**
- * Convierte la respuesta cruda del modelo en una decisión usable.
- *
- * Es deliberadamente indestructible: si el JSON no aparece, el texto
- * crudo ES la respuesta (los modelos que ignoran el formato suelen
- * contestar bien igual — tirar eso a la basura deja al cliente mudo).
- *
- * `validReasons` son las claves de derivación configuradas para este
- * negocio. Un motivo inventado por el modelo se descarta con aviso: mejor
- * que el bot siga a que derive por un motivo que el panel no conoce.
- */
-export function parseTurnDecision(raw: string, validReasons: string[]): TurnDecision {
+export function parseTurnDecision(raw: string): TurnDecision {
   const parsed = extractJson(raw) as {
     mensajes?: unknown
     derivar?: unknown
     datos?: unknown
-    pedido?: unknown
   } | null
 
   if (!parsed || !Array.isArray(parsed.mensajes)) {
-    return { messages: cleanMessages([raw]), escalateReason: null, data: null, order: null }
+    // Un objeto de control mal formado no debe filtrarse al chat como texto.
+    return { messages: parsed ? [] : cleanMessages([raw]), escalateReason: null, data: null }
   }
 
-  let escalateReason: string | null = null
-  if (typeof parsed.derivar === 'string' && parsed.derivar.trim()) {
-    const clave = parsed.derivar.trim()
-    if (validReasons.includes(clave)) {
-      escalateReason = clave
-    } else {
-      logEvent({
-        eventType: 'internal.error',
-        severity: 'warn',
-        payload: { donde: 'decision', problema: 'motivo de derivación desconocido', clave },
-      })
-    }
-  }
-
+  const escalateReason = typeof parsed.derivar === 'string' ? parsed.derivar.trim().slice(0, 500) || null : null
   let data: Record<string, string> | null = null
   if (parsed.datos && typeof parsed.datos === 'object' && !Array.isArray(parsed.datos)) {
-    const limpio: Record<string, string> = {}
-    for (const [k, v] of Object.entries(parsed.datos as Record<string, unknown>)) {
-      if (typeof v === 'string' && v.trim()) limpio[k.trim()] = v.trim()
-    }
-    if (Object.keys(limpio).length) data = limpio
+    const entries = Object.entries(parsed.datos)
+      .filter(([k, v]) => k.trim() && !['__proto__', 'constructor', 'prototype'].includes(k.trim()) && typeof v === 'string' && v.trim())
+      .map(([k, v]) => [k.trim(), (v as string).trim()])
+    if (entries.length) data = Object.fromEntries(entries)
   }
 
-  // El pedido se toma solo si trae items con pinta de reales. La
-  // validación contra el catálogo (¿existen esos ids?) no es de acá:
-  // vive donde se crea el pedido, que es quien conoce el catálogo.
-  let order: TurnDecision['order'] = null
-  const pedido = parsed.pedido as { items?: unknown; nota?: unknown } | null
-  if (pedido && typeof pedido === 'object' && Array.isArray(pedido.items)) {
-    const items = pedido.items
-      .map((it) => {
-        const item = it as { id?: unknown; cantidad?: unknown }
-        if (typeof item.id !== 'string' || !item.id.trim()) return null
-        const qty =
-          typeof item.cantidad === 'number' && Number.isFinite(item.cantidad)
-            ? Math.max(1, Math.round(item.cantidad))
-            : 1
-        return { id: item.id.trim(), qty }
-      })
-      .filter((it): it is { id: string; qty: number } => it !== null)
-    if (items.length) {
-      order = { items, note: typeof pedido.nota === 'string' ? pedido.nota.trim() : '' }
-    }
-  }
-
-  return {
-    messages: cleanMessages(parsed.mensajes.map((m) => (typeof m === 'string' ? m : ''))),
-    escalateReason,
-    data,
-    order,
-  }
+  return { messages: cleanMessages(parsed.mensajes), escalateReason, data }
 }
 
-function cleanMessages(messages: string[]): string[] {
-  return (
-    messages
-      .map((m) => m.trim())
-      .filter(Boolean)
-      // El prompt pide mayúscula inicial y el modelo a veces capitaliza
-      // "Https://" — y el chat no reconoce ESO como link clickeable.
-      .map((m) => m.replace(/\bHttps?:\/\//g, (s) => s.toLowerCase()))
-      // Más de 3 burbujas por turno se siente (y se detecta) como spam.
-      .slice(0, MAX_BUBBLES)
-  )
+function cleanMessages(messages: unknown[]): string[] {
+  return messages
+    .filter((m): m is string => typeof m === 'string')
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .map((m) => m.replace(/\bHttps?:\/\//g, (s) => s.toLowerCase()))
+    .slice(0, MAX_BUBBLES)
 }

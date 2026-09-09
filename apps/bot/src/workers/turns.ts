@@ -2,12 +2,11 @@ import { getSettings, hasLlm, TICK_MS } from '../config/settings.js'
 import { describe } from '../utils/errors.js'
 import { botPuedeResponder } from '../config/test-mode.js'
 import { logEvent } from '../observability/events.js'
-import { notifyOrderPending, notifyReview, notifyTurnFailed } from '../notifications/notify.js'
+import { notifyReview, notifyTurnFailed } from '../notifications/notify.js'
 import { buildTurnContext } from '../agents/context.js'
 import { parseTurnDecision } from '../agents/decision.js'
 import { planFollowups } from '../agents/followup.js'
 import { chat, type Turn } from '../agents/llm.js'
-import { createOrderFromChat } from '../orders/from-chat.js'
 import {
   cancelPendingFollowups,
   claimDueTurns,
@@ -49,12 +48,6 @@ import {
 let corriendo = false
 let avisoApagado = false
 let avisoSinClave = false
-
-// La red de seguridad cuando el modelo no devolvió nada: antes que el
-// silencio, una línea neutra, y el chat pasa a una persona. No es voz
-// del negocio (por eso no está en el panel): es el código cubriendo una
-// falla.
-const LINEA_PUENTE = 'Dame un momento que lo reviso y te escribo.'
 
 /**
  * Lo que el modelo lee por cada mensaje del hilo. Un mensaje sin texto
@@ -98,7 +91,7 @@ async function escalar(
   })
 }
 
-async function responder(conversacion: Conversation): Promise<void> {
+export async function responder(conversacion: Conversation): Promise<void> {
   if (!botPuedeResponder(await getConfig(), conversacion.chat_id)) return
   // ¿Sigue siendo el último mensaje el que disparó este turno?
   //
@@ -153,7 +146,7 @@ async function responder(conversacion: Conversation): Promise<void> {
     return
   }
 
-  const { system, config } = await buildTurnContext(conversacion.channel)
+  const { system, config } = await buildTurnContext(conversacion.channel, conversacion.contact_id)
   const turnos: Turn[] = historial.map((m) => ({
     role: m.author === 'customer' ? 'user' : 'assistant',
     content: turnContent(m),
@@ -167,21 +160,11 @@ async function responder(conversacion: Conversation): Promise<void> {
   ])
   if (!actual || actual.state !== 'bot' || !configActual.bot_enabled ||
       !botPuedeResponder(configActual, actual.chat_id) || ultimoActual !== ultimo) return
-  const decision = parseTurnDecision(
-    crudo,
-    (config.escalation_reasons ?? []).map((r) => r.key),
-  )
+  const decision = parseTurnDecision(crudo)
 
-  // El modelo no devolvió nada usable. Antes que el silencio, una línea
-  // puente — y el chat a revisión para que lo levante una persona.
+  // Sin texto usable, el equipo recibe el caso. No se inventa una voz fija.
   if (!decision.messages.length) {
     console.warn(`[turno] el modelo no devolvió nada para ${conversacion.chat_id}`)
-    await enqueueSend({
-      conversationId: conversacion.id,
-      channel: conversacion.channel,
-      chatId: conversacion.chat_id,
-      body: LINEA_PUENTE,
-    })
     await escalar(
       conversacion,
       'respuesta_vacia',
@@ -234,56 +217,6 @@ async function responder(conversacion: Conversation): Promise<void> {
     }
   }
 
-  // El cliente confirmó un pedido. El bot lo ANOTA — no lo cierra: el
-  // pedido nace en la primera etapa, el cliente ya recibió (en los
-  // mensajes del modelo, con la voz del negocio) un "quedó anotado"
-  // honesto, y el equipo lo confirma desde el panel. Si además el modelo
-  // pidió derivar, el pedido manda: ya deriva por sí mismo.
-  if (decision.order) {
-    try {
-      const resultado = await createOrderFromChat(conversacion, decision.order, config)
-      await pauseForHuman(conversacion.id)
-      await cancelPendingFollowups(conversacion.id)
-      const detalle = resultado.ok ? resultado.summary : (resultado.problem ?? '')
-      const nuevo = await queueReview(conversacion.id, 'pedido_nuevo', detalle)
-      logEvent({
-        eventType: 'review.queued',
-        conversationId: conversacion.id,
-        payload: { reason: 'pedido_nuevo', nuevo, creado: resultado.ok },
-      })
-      await notifyOrderPending({
-        conversationId: conversacion.id,
-        chatId: conversacion.chat_id,
-        orderLabel: config.labels?.order ?? 'Pedido',
-        summary: resultado.ok
-          ? resultado.summary
-          : `NO se pudo crear solo: ${resultado.problem ?? 'motivo desconocido'}`,
-        episodeKey: `pedido:${conversacion.last_inbound_id ?? conversacion.id}`,
-      })
-    } catch (err) {
-      // El pedido falló pero el cliente ya recibió respuesta: que lo
-      // levante una persona, con el error a la vista.
-      logEvent({
-        eventType: 'order.failed',
-        severity: 'error',
-        conversationId: conversacion.id,
-        payload: { error: describe(err).slice(0, 300) },
-      })
-      await escalar(
-        conversacion,
-        'pedido_nuevo',
-        'El pedido confirmado no se pudo crear — armalo a mano desde el chat',
-        describe(err).slice(0, 200),
-      )
-    }
-    logEvent({
-      eventType: 'turn.answered',
-      conversationId: conversacion.id,
-      payload: { burbujas: decision.messages.length, pedido: true },
-    })
-    return
-  }
-
   // El modelo pidió derivar: la respuesta YA salió (el cliente nunca
   // queda mudo) y recién ahora la conversación pasa al equipo.
   if (decision.escalateReason) {
@@ -311,7 +244,7 @@ async function responder(conversacion: Conversation): Promise<void> {
   // demorar la respuesta — y si falla, el turno ya está completo.
   if (!decision.escalateReason) {
     try {
-      await planFollowups(conversacion, historial, config)
+      await planFollowups(conversacion, [...historial, ...decision.messages.map((body) => ({ author: 'bot' as const, body }))], config)
     } catch (err) {
       console.warn('[turno] no se pudieron planear seguimientos:', describe(err))
     }

@@ -66,7 +66,7 @@ test('un destino demo jamás llega al proveedor', async () => {
   assert.equal(calls.length, 0)
 })
 
-const form = { tokenTail: 'abcdefgh', pack: 'general', businessName: 'Demo', ownerEmail: 'owner@example.invalid', ownerPassword: 'test-password', seedDemo: true }
+const form = { tokenTail: 'abcdefgh', pack: 'agent', businessName: 'Demo', ownerEmail: 'owner@example.invalid', ownerPassword: 'test-password', seedDemo: true }
 const finish = (body) => installRoute.request('/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
 test('instalador: validación antes de escribir y finalización con una única transacción', async () => {
@@ -81,11 +81,13 @@ test('instalador: validación antes de escribir y finalización con una única t
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0)
   assert.equal((await finish(form)).status, 200)
   const rpc = calls.find((c) => c.path.endsWith('finish_installation'))
-  assert.ok(rpc.body.catalog_rows.length)
+  assert.deepEqual(rpc.body.catalog_rows, [])
+  assert.equal(rpc.body.settings.pack, 'agent')
+  assert.deepEqual(rpc.body.settings.order_stages, [])
   assert.ok(rpc.body.module_rows.every((m) => !m.enabled))
 })
 
-test('instalador: un fallo del RPC conserva la identidad y permite retomar sin duplicar catálogo', async () => {
+test('instalador: un fallo del RPC conserva la identidad y permite retomar la instalación', async () => {
   let rpcAttempts = 0
   let creates = 0
   const calls = simulate((c) => {
@@ -124,4 +126,17 @@ test('webhook exige secreto y comunica fallos de persistencia para que WAHA rein
   assert.equal((await webhookRoute.request('/', { method: 'POST', body: JSON.stringify(event) })).status, 401)
   assert.equal((await webhookRoute.request('/?secret=test-webhook', { method: 'POST', body: JSON.stringify(event) })).status, 503)
   await new Promise((resolve) => setImmediate(resolve))
+})
+
+test('la ficha valida datos y actualiza una etapa libre por el mismo merge del agente', async () => {
+  const id = '00000000-0000-4000-8000-000000000010'
+  const calls = simulate((c) => {
+    if (c.path === '/rest/v1/contacts') return json({ id })
+    if (c.path.endsWith('/merge_lead_data')) return json(null)
+  })
+  const save = (body) => panelRoute.request('/lead-data', { method: 'POST', body: JSON.stringify(body) })
+  assert.equal((await save({ contact_id: id, data: { etapa: 42 } })).status, 400)
+  assert.equal(calls.length, 0)
+  assert.equal((await save({ contact_id: id, data: { etapa: 'Link compartido', interes: 'Diseño' } })).status, 200)
+  assert.deepEqual(calls.at(-1).body, { lead_id: id, new_data: { etapa: 'Link compartido', interes: 'Diseño' } })
 })

@@ -1,446 +1,61 @@
 import { useCallback, useEffect, useState } from 'react'
-import clsx from 'clsx'
-import { MODULES } from '@fw/core'
-import { ChevronDown, ChevronUp, KeyRound, Plus, Save, Trash2, UserPlus } from 'lucide-react'
+import { KeyRound, Save, Trash2, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { api } from '../lib/api.js'
 import { Avatar, Badge, Button, Card, Field, Input, Notice, PageHeader, Select } from '../ui'
 
-/**
- * Ajustes: lo que hace que el mismo repo se sienta nativo en una tienda
- * y en una clínica, sin tocar código.
- *
- * Cuatro cosas viven acá:
- *
- * 1. Los MÓDULOS. Se prenden y se apagan; nunca se borra una carpeta.
- *    El menú de la izquierda y los pasos del servidor leen esta tabla.
- *
- * 2. Las TRES LISTAS. El diccionario de palabras, los estados por los
- *    que pasa un pedido y los motivos por los que la IA deriva a una
- *    persona. Son datos en `app_config`, no enums en el código.
- *
- * 3. Lo AVANZADO: tiempos del bot, ventana nocturna, moneda. Antes eran
- *    variables de entorno; ahora se guardan por el servidor, que valida.
- *
- * 4. Los USUARIOS del panel. Quien no está acá no entra, aunque tenga
- *    cuenta en Supabase.
- *
- * La regla dura de las listas: **la clave no se edita, la etiqueta
- * sí**. Un pedido guardado dice `stage = 'pago'` y una derivación dice
- * `reason = 'queja'`; si acá se le cambia la clave, esas filas quedan
- * apuntando a un estado que ya no existe y desaparecen de las vistas.
- * Renombrar "Pago" a "Señado" es cambiar la etiqueta y no toca ni una
- * fila vieja.
- */
-
-/** El diccionario: claves fijas del producto, texto libre del negocio. */
-const CAMPOS_DICCIONARIO = [
-  { key: 'contact', label: 'Contacto, en singular', ejemplo: 'Cliente / Paciente' },
-  { key: 'contact_plural', label: 'Contactos, en plural', ejemplo: 'Clientes / Pacientes' },
-  { key: 'item', label: 'Lo que se ofrece, en singular', ejemplo: 'Producto / Prestación' },
-  { key: 'item_plural', label: 'Lo que se ofrece, en plural', ejemplo: 'Productos / Prestaciones' },
-  { key: 'order', label: 'Pedido, en singular', ejemplo: 'Venta / Consulta' },
-  { key: 'order_plural', label: 'Pedidos, en plural', ejemplo: 'Ventas / Consultas' },
-  { key: 'order_new', label: 'Botón de alta', ejemplo: 'Nueva venta / Nueva consulta' },
+const CAMPOS = [
+  { key: 'debounce_seconds', label: 'Espera antes de contestar (segundos)', min: 5, max: 600 },
+  { key: 'send_pause_min_ms', label: 'Pausa mínima entre envíos (ms)', min: 2000, max: 60000 },
+  { key: 'send_pause_max_ms', label: 'Pausa máxima entre envíos (ms)', min: 2000, max: 60000 },
+  { key: 'quiet_hours_start', label: 'No enviar seguimientos desde (hora local)', min: 0, max: 23 },
+  { key: 'quiet_hours_end', label: 'Retomar seguimientos a las (hora local)', min: 0, max: 23 },
 ]
-
-/** De "Presupuesto enviado" a "presupuesto_enviado": la clave que guarda la base. */
-function claveDesde(texto) {
-  return texto
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 40)
-}
-
-const CAMPOS_AVANZADO = ['debounce_seconds', 'send_pause_min_ms', 'send_pause_max_ms', 'quiet_hours_start', 'quiet_hours_end', 'currency']
 
 export default function Ajustes() {
   const [config, setConfig] = useState(null)
-  const [modulos, setModulos] = useState([])
-  const [guardando, setGuardando] = useState(null)
+  const [guardando, setGuardando] = useState(false)
   const [aviso, setAviso] = useState(null)
-
+  const avisar = useCallback((texto, esError = false) => setAviso({ texto, esError }), [])
   useEffect(() => {
-    supabase
-      .from('app_config')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => setConfig(data))
-    supabase
-      .from('modules')
-      .select('key, enabled')
-      .then(({ data }) => setModulos(data ?? []))
-  }, [])
+    supabase.from('app_config').select('*').eq('id', 1).maybeSingle()
+      .then(({ data, error }) => error ? avisar(error.message, true) : setConfig(data))
+  }, [avisar])
 
-  const avisar = useCallback((texto, esError = false) => {
-    setAviso({ texto, esError })
-    setTimeout(() => setAviso(null), 4000)
-  }, [])
-
-  // ── Módulos ────────────────────────────────────────────────
-  // Se guarda al toque, sin botón: es un interruptor, y un interruptor
-  // que hay que confirmar se siente roto.
-  async function alternarModulo(key, enabled) {
-    setModulos((previos) =>
-      previos.some((m) => m.key === key)
-        ? previos.map((m) => (m.key === key ? { ...m, enabled } : m))
-        : [...previos, { key, enabled }],
-    )
-    const { error } = await supabase
-      .from('modules')
-      .upsert({ key, enabled, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-    if (error) {
-      avisar(`No se pudo guardar el módulo: ${error.message}`, true)
-      return
-    }
-    // El menú se arma con esta tabla: se le avisa para que se rearme.
-    window.dispatchEvent(new Event('fw:modules'))
-    avisar(enabled ? 'Módulo prendido.' : 'Módulo apagado.')
-  }
-
-  // ── Las tres listas ────────────────────────────────────────
-  function editarConfig(campo, valor) {
-    setConfig((previo) => ({ ...previo, [campo]: valor }))
-  }
-
-  async function guardarDiccionario() {
-    setGuardando('labels')
-    const { error } = await supabase
-      .from('app_config')
-      .update({ labels: config.labels ?? {} })
-      .eq('id', 1)
-    setGuardando(null)
-    avisar(error ? `No se pudo guardar: ${error.message}` : 'Diccionario guardado.', Boolean(error))
-  }
-
-  async function guardarLista(campo, valores, nombre) {
-    if (!valores.length) {
-      avisar(`Tiene que quedar al menos un elemento en ${nombre}.`, true)
-      return
-    }
-    if (valores.some((v) => !v.label.trim())) {
-      avisar('Hay un elemento sin nombre.', true)
-      return
-    }
-    setGuardando(campo)
-    const { error } = await supabase.from('app_config').update({ [campo]: valores }).eq('id', 1)
-    setGuardando(null)
-    avisar(error ? `No se pudo guardar: ${error.message}` : `${nombre} guardados.`, Boolean(error))
-  }
-
-  /** Un estado con pedidos adentro no se borra: quedarían huérfanos. */
-  async function puedeBorrarEstado(key) {
-    const { count } = await supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('stage', key)
-    if (count) {
-      avisar(`No se puede borrar: hay ${count} pedido(s) en ese estado.`, true)
-      return false
-    }
-    return true
-  }
-
-  // ── Avanzado ───────────────────────────────────────────────
-  async function guardarAvanzado() {
-    setGuardando('avanzado')
+  async function guardar() {
+    setGuardando(true)
     try {
-      const patch = {}
-      for (const k of CAMPOS_AVANZADO) patch[k] = config[k]
-      await api('/settings', patch)
-      avisar('Guardado. El bot lo usa desde el próximo mensaje.')
-    } catch (err) {
-      avisar(err.message, true)
-    } finally {
-      setGuardando(null)
-    }
+      await api('/settings', Object.fromEntries(CAMPOS.map(({ key }) => [key, config[key]])))
+      avisar('Configuración guardada.')
+    } catch (err) { avisar(err.message, true) }
+    finally { setGuardando(false) }
   }
 
-  if (!config) return <p className="text-[13.5px] text-ink-3">Cargando…</p>
-
-  const estados = config.order_stages ?? []
-  const motivos = config.escalation_reasons ?? []
-  const labels = config.labels ?? {}
-  const prendido = (key) => Boolean(modulos.find((m) => m.key === key)?.enabled)
-
-  return (
-    <>
-      <PageHeader title="Ajustes" subtitle="Los módulos que corren, las palabras del negocio, los tiempos del bot y quién entra." />
-      {aviso && (
-        <Notice tone={aviso.esError ? 'error' : 'ok'} className="mb-4">
-          {aviso.texto}
-        </Notice>
-      )}
-
-      <div className="grid gap-5">
-        {/* ── Módulos ─────────────────────────────────────────── */}
-        <Card
-          title="Módulos"
-          subtitle='Un módulo apagado no corre, no aparece en el menú y no pide claves. Prenderlo y apagarlo es seguro. Los que dicen "próximamente" todavía no tienen código.'
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {MODULES.map((m) => (
-              <label
-                key={m.key}
-                className={clsx(
-                  'flex items-start gap-3 rounded-xl border border-line px-4 py-3 transition-colors',
-                  m.available ? 'cursor-pointer hover:bg-surface-2' : 'opacity-60',
-                )}
-              >
-                <input
-                  type="checkbox"
-                  className="mt-[3px] h-4 w-4 shrink-0 accent-brand"
-                  checked={m.available && prendido(m.key)}
-                  disabled={!m.available}
-                  onChange={(e) => alternarModulo(m.key, e.target.checked)}
-                />
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
-                    {m.label} {!m.available && <Badge>próximamente</Badge>}
-                  </span>
-                  <span className="block text-[12.5px] text-ink-3">{m.description}</span>
-                </span>
-              </label>
-            ))}
+  return <>
+    <PageHeader title="Ajustes" subtitle="Los tiempos del motor y las personas que pueden entrar al panel." />
+    {aviso && <Notice tone={aviso.esError ? 'error' : 'ok'} className="mb-4">{aviso.texto}</Notice>}
+    <div className="grid gap-5">
+      <Card title="Comportamiento del agente" subtitle="El objetivo, la información, los datos a pedir y las reglas de seguimiento se definen en el prompt.">
+        <Button to="/studio">Editar prompt en Studio</Button>
+      </Card>
+      <Card title="Tiempos del motor" subtitle="La espera reúne mensajes antes de responder. Las pausas regulan la cola. La ventana nocturna posterga seguimientos; usá la misma hora de inicio y fin para desactivarla.">
+        {!config ? <p>Cargando…</p> : <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CAMPOS.map(({ key, label, min, max }) => <Field key={key} label={label}>
+              <Input type="number" min={min} max={max} value={config[key] ?? min}
+                onChange={(e) => setConfig({ ...config, [key]: Number(e.target.value) })} />
+            </Field>)}
           </div>
-        </Card>
-
-        <div className="grid gap-5 xl:grid-cols-2">
-          {/* ── Diccionario ─────────────────────────────────────── */}
-          <Card
-            title="Diccionario"
-            subtitle="Cómo se llama cada cosa en este negocio. El panel entero usa estas palabras: en una clínica no hay ventas, hay consultas."
-          >
-            <div className="grid gap-3">
-              {CAMPOS_DICCIONARIO.map((campo) => (
-                <Field key={campo.key} label={`${campo.label} — ej. ${campo.ejemplo}`}>
-                  <Input
-                    value={labels[campo.key] ?? ''}
-                    onChange={(e) => editarConfig('labels', { ...labels, [campo.key]: e.target.value })}
-                  />
-                </Field>
-              ))}
-              <div>
-                <Button variant="primary" icon={Save} onClick={guardarDiccionario} disabled={guardando === 'labels'}>
-                  {guardando === 'labels' ? 'Guardando…' : 'Guardar'}
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* ── Avanzado ────────────────────────────────────────── */}
-          <Card title="Avanzado" subtitle="Los tiempos del bot. Los valores de fábrica salieron de producción: cambialos sabiendo por qué.">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Espera antes de contestar (segundos)"
-                hint="Junta los mensajes sueltos del cliente; bajarla hace que el bot conteste tres veces seguidas."
-              >
-                <Input
-                  type="number"
-                  min={5}
-                  max={600}
-                  value={config.debounce_seconds ?? 90}
-                  onChange={(e) => editarConfig('debounce_seconds', Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Moneda" hint="Lo que se muestra al lado de los precios.">
-                <Input value={config.currency ?? '$'} onChange={(e) => editarConfig('currency', e.target.value)} />
-              </Field>
-              <Field label="Pausa mínima entre envíos (ms)" hint="Es lo que protege al número: no bajar de 2000.">
-                <Input
-                  type="number"
-                  min={1000}
-                  max={60000}
-                  step={500}
-                  value={config.send_pause_min_ms ?? 2000}
-                  onChange={(e) => editarConfig('send_pause_min_ms', Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Pausa máxima entre envíos (ms)">
-                <Input
-                  type="number"
-                  min={1000}
-                  max={60000}
-                  step={500}
-                  value={config.send_pause_max_ms ?? 6000}
-                  onChange={(e) => editarConfig('send_pause_max_ms', Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Ventana nocturna: desde (hora local)" hint="A partir de esta hora no salen seguimientos.">
-                <Input
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={config.quiet_hours_start ?? 23}
-                  onChange={(e) => editarConfig('quiet_hours_start', Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Ventana nocturna: hasta">
-                <Input
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={config.quiet_hours_end ?? 9}
-                  onChange={(e) => editarConfig('quiet_hours_end', Number(e.target.value))}
-                />
-              </Field>
-            </div>
-            <div className="mt-4">
-              <Button variant="primary" icon={Save} onClick={guardarAvanzado} disabled={guardando === 'avanzado'}>
-                {guardando === 'avanzado' ? 'Guardando…' : 'Guardar'}
-              </Button>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-2">
-          {/* ── Estados del pedido ──────────────────────────────── */}
-          <ListaEditable
-            titulo={`Estados de ${labels.order_plural?.toLowerCase() ?? 'los pedidos'}`}
-            ayuda="El camino que recorre un pedido. El primero es donde nace cuando lo anota el bot; los finales son los que lo sacan de la bandeja."
-            valores={estados}
-            conFinal
-            guardando={guardando === 'order_stages'}
-            onAntesDeBorrar={puedeBorrarEstado}
-            onCambio={(v) => editarConfig('order_stages', v)}
-            onGuardar={(v) => guardarLista('order_stages', v, 'Estados')}
-          />
-
-          {/* ── Motivos de derivación ───────────────────────────── */}
-          <ListaEditable
-            titulo="Motivos de derivación"
-            ayuda="Por qué la IA le pasa un chat a una persona. Estos son los que el bot puede elegir: si no está en la lista, no lo puede usar."
-            valores={motivos}
-            guardando={guardando === 'escalation_reasons'}
-            onCambio={(v) => editarConfig('escalation_reasons', v)}
-            onGuardar={(v) => guardarLista('escalation_reasons', v, 'Motivos')}
-          />
-        </div>
-
-        {/* ── Usuarios ────────────────────────────────────────── */}
-        <Usuarios avisar={avisar} />
-      </div>
-    </>
-  )
+          <Button className="mt-4" icon={Save} variant="primary" onClick={guardar} disabled={guardando}>
+            {guardando ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </>}
+      </Card>
+      <Usuarios avisar={avisar} />
+    </div>
+  </>
 }
 
-/**
- * Una lista ordenada de {key, label} (más `final` en los estados).
- *
- * El orden importa: en los estados es el camino del pedido, y el primero
- * de la lista es donde nace. Por eso hay flechas y no un ordenamiento
- * alfabético.
- */
-function ListaEditable({ titulo, ayuda, valores, conFinal = false, guardando, onCambio, onGuardar, onAntesDeBorrar }) {
-  const [nuevo, setNuevo] = useState('')
-
-  function agregar() {
-    const label = nuevo.trim()
-    if (!label) return
-    const key = claveDesde(label)
-    if (!key) return
-    if (valores.some((v) => v.key === key)) return
-    onCambio([...valores, conFinal ? { key, label, final: false } : { key, label }])
-    setNuevo('')
-  }
-
-  function mover(i, delta) {
-    const destino = i + delta
-    if (destino < 0 || destino >= valores.length) return
-    const copia = [...valores]
-    ;[copia[i], copia[destino]] = [copia[destino], copia[i]]
-    onCambio(copia)
-  }
-
-  async function borrar(i) {
-    if (onAntesDeBorrar && !(await onAntesDeBorrar(valores[i].key))) return
-    onCambio(valores.filter((_, j) => j !== i))
-  }
-
-  return (
-    <Card title={titulo} subtitle={ayuda}>
-      <ul className="divide-y divide-line">
-        {valores.map((v, i) => (
-          <li key={v.key} className="flex flex-wrap items-center gap-2 py-2.5">
-            <Input
-              className="min-w-[160px] flex-1"
-              value={v.label}
-              onChange={(e) => {
-                const copia = [...valores]
-                copia[i] = { ...v, label: e.target.value }
-                onCambio(copia)
-              }}
-            />
-            <code
-              className="rounded-md bg-surface-2 px-2 py-1 font-mono text-[11.5px] text-ink-3"
-              title="La clave guardada en la base. No se edita."
-            >
-              {v.key}
-            </code>
-            {conFinal && (
-              <label
-                className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-ink-2"
-                title="Un estado final saca al pedido de la bandeja"
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-brand"
-                  checked={Boolean(v.final)}
-                  onChange={(e) => {
-                    const copia = [...valores]
-                    copia[i] = { ...v, final: e.target.checked }
-                    onCambio(copia)
-                  }}
-                />
-                Final
-              </label>
-            )}
-            <div className="flex gap-1">
-              <Button size="icon" variant="ghost" icon={ChevronUp} onClick={() => mover(i, -1)} disabled={i === 0} title="Subir" />
-              <Button
-                size="icon"
-                variant="ghost"
-                icon={ChevronDown}
-                onClick={() => mover(i, 1)}
-                disabled={i === valores.length - 1}
-                title="Bajar"
-              />
-              <Button size="icon" variant="ghost" icon={Trash2} className="text-danger" onClick={() => borrar(i)} title="Borrar" />
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Input
-          className="min-w-[160px] flex-1"
-          value={nuevo}
-          placeholder="Agregar uno nuevo"
-          onChange={(e) => setNuevo(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && agregar()}
-        />
-        <Button icon={Plus} onClick={agregar}>
-          Agregar
-        </Button>
-      </div>
-
-      <div className="mt-4">
-        <Button variant="primary" icon={Save} onClick={() => onGuardar(valores)} disabled={guardando}>
-          {guardando ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </div>
-    </Card>
-  )
-}
-
-/**
- * Quién entra al panel. Las altas y bajas pasan por el servidor porque
- * tocan Supabase Auth (clave de servicio) y la tabla del equipo a la vez.
- */
 function Usuarios({ avisar }) {
   const [usuarios, setUsuarios] = useState([])
   const [yo, setYo] = useState('')

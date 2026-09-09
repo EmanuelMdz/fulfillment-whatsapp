@@ -3,8 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import clsx from 'clsx'
 import {
   Inbox,
-  ClipboardList,
-  Package,
+  ContactRound,
   ChartNoAxesColumn,
   SlidersHorizontal,
   FlaskConical,
@@ -43,8 +42,7 @@ const MENU = [
   // un globo de diálogo genérico.
   { to: '/', end: true, icon: WhatsappIcon, texto: () => 'Conversaciones' },
   { to: '/revision', icon: Inbox, texto: () => 'Revisión' },
-  { to: '/pedidos', icon: ClipboardList, texto: (l) => l.order_plural ?? 'Pedidos' },
-  { to: '/catalogo', icon: Package, texto: (l) => l.item_plural ?? 'Catálogo' },
+  { to: '/leads', icon: ContactRound, texto: () => 'Leads' },
   { to: '/metricas', icon: ChartNoAxesColumn, texto: () => 'Métricas' },
 ]
 
@@ -60,6 +58,8 @@ const REFRESCO_ESTADO_MS = 30000
 function ItemMenu({ to, end, icon: Icono, children }) {
   return (
     <NavLink
+      title={children}
+      aria-label={children}
       to={to}
       end={end}
       className={({ isActive }) =>
@@ -126,7 +126,7 @@ export default function Layout() {
     async function revisar() {
       try {
         const h = await fetch('/health').then((r) => r.json())
-        setEstado({ whatsapp: h.whatsapp, llm: h.llm })
+        setEstado({ whatsapp: h.whatsapp, llm: h.llm, session: h.session })
       } catch {
         // El servidor no contesta: no hay nada útil que mostrar acá.
       }

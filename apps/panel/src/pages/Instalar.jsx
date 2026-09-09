@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api.js'
 import iso from '../assets/ainnovate-iso.png'
-import { Button, Card, Checkbox, Field, Input, Notice, Radio, Select, Textarea } from '../ui'
+import { Button, Card, Field, Input, Notice, Select, Textarea } from '../ui'
 
 /**
  * El asistente de instalación. Sin terminal.
@@ -39,12 +39,6 @@ function zonaDelNavegador() {
   }
 }
 
-const PACKS = [
-  { key: 'general', nombre: 'General', detalle: 'Clientes, productos, pedidos. Sirve para cualquier negocio; después se renombra todo desde Ajustes.' },
-  { key: 'ecommerce', nombre: 'Ecommerce', detalle: 'Clientes, productos, ventas. Para vender cosas.' },
-  { key: 'servicios', nombre: 'Servicios', detalle: 'Pacientes, prestaciones, consultas. Registra solicitudes; el equipo confirma fecha y disponibilidad.' },
-]
-
 function Paso({ n, texto, estado }) {
   return (
     <span
@@ -68,11 +62,9 @@ export default function Instalar({ onListo }) {
   const [verificando, setVerificando] = useState(false)
   const [migrando, setMigrando] = useState(false)
   const [form, setForm] = useState({
-    pack: 'general',
+    pack: 'agent',
     businessName: '',
     timezone: zonaDelNavegador(),
-    currency: '$',
-    seedDemo: true,
     ownerEmail: '',
     ownerPassword: '',
     tokenTail: '',
@@ -261,30 +253,8 @@ export default function Instalar({ onListo }) {
           <form onSubmit={terminar} className="grid gap-5">
             <Card title="El negocio">
               <div className="grid gap-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {PACKS.map((p) => (
-                    <label
-                      key={p.key}
-                      className={clsx(
-                        'flex cursor-pointer items-start gap-2.5 rounded-xl border px-4 py-3 transition-colors',
-                        form.pack === p.key ? 'border-brand bg-brand-soft/40' : 'border-line hover:bg-surface-2',
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="pack"
-                        className="mt-[3px] h-4 w-4 accent-brand"
-                        checked={form.pack === p.key}
-                        onChange={() => setForm({ ...form, pack: p.key })}
-                      />
-                      <span>
-                        <span className="block text-[14px] font-semibold text-ink">{p.nombre}</span>
-                        <span className="block text-[12.5px] text-ink-3">{p.detalle}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <Field label="Nombre del negocio (la IA se presenta con esto)">
+                <p className="text-ink-2">Tu agente empieza con conversaciones, leads y seguimientos. Su objetivo se define en el prompt de Studio.</p>
+                <Field label="Nombre del negocio">
                   <Input value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} required />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -297,15 +267,7 @@ export default function Instalar({ onListo }) {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Moneda (lo que se muestra al lado de los precios)">
-                    <Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} />
-                  </Field>
                 </div>
-                <Checkbox
-                  label="Cargar un catálogo de ejemplo, para que el bot tenga de qué hablar hoy (se borra después)"
-                  checked={form.seedDemo}
-                  onChange={(e) => setForm({ ...form, seedDemo: e.target.checked })}
-                />
               </div>
             </Card>
 

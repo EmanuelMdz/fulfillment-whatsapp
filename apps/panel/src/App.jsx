@@ -3,8 +3,7 @@ import RequireAuth from './ui/RequireAuth.jsx'
 import Layout from './ui/Layout.jsx'
 import Conversaciones from './pages/Conversaciones.jsx'
 import Revision from './pages/Revision.jsx'
-import Pedidos from './pages/Pedidos.jsx'
-import Catalogo from './pages/Catalogo.jsx'
+import Leads from './pages/Leads.jsx'
 import Studio from './pages/Studio.jsx'
 import TestChat from './pages/TestChat.jsx'
 import Metricas from './pages/Metricas.jsx'
@@ -25,8 +24,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route index element={<Conversaciones />} />
             <Route path="/revision" element={<Revision />} />
-            <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/catalogo" element={<Catalogo />} />
+            <Route path="/leads" element={<Leads />} />
             <Route path="/studio" element={<Studio />} />
             <Route path="/test" element={<TestChat />} />
             <Route path="/metricas" element={<Metricas />} />

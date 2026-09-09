@@ -26,6 +26,7 @@ test('demo usa destinos que no son teléfonos, no deja tareas activas y borra so
   await sembrar(db)
   const contacts = db.calls.filter((c) => c.table === 'contacts' && c.rows)
   assert.equal(contacts.length, 5)
+  assert.ok(!db.calls.some((c) => c.table === 'orders' && c.rows))
   assert.ok(contacts.every((c) => c.rows.phone.startsWith('demo:') && c.rows.collected._demo === DEMO_MARKER))
   assert.ok(db.calls.filter((c) => c.table === 'followups' && c.rows).every((c) => c.rows.status === 'cancelled'))
   assert.deepEqual(db.calls[0].filters, [['eq', 'collected->>_demo', DEMO_MARKER], ['like', 'phone', 'demo:%']])

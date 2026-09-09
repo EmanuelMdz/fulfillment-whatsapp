@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { randomBytes } from 'node:crypto'
-import { MODULES, PACKS, SEEDS, modulesForPack } from '@fw/core'
+import { PACKS } from '@fw/core'
 import { loadEnv } from '../config/env.js'
 import { forgetSettings } from '../config/settings.js'
 import { db } from '../db/client.js'
@@ -142,8 +142,10 @@ installRoute.post('/finish', async (c) => {
     }
   }
 
-  const pack = typeof body.pack === 'string' && Object.hasOwn(PACKS, body.pack) ? body.pack : null
-  if (!pack) return c.json({ error: `Elegí un pack: ${Object.keys(PACKS).join(' / ')}` }, 400)
+  const pack = 'agent'
+  if (body.pack !== undefined && body.pack !== pack) {
+    return c.json({ error: 'La instalación inicial es un agente genérico. Recargá el asistente.' }, 400)
+  }
   const businessName = typeof body.businessName === 'string' ? body.businessName.trim() : ''
   if (!businessName) return c.json({ error: 'Falta el nombre del negocio' }, 400)
   const email = typeof body.ownerEmail === 'string' ? body.ownerEmail.trim().toLowerCase() : ''
@@ -182,7 +184,6 @@ installRoute.post('/finish', async (c) => {
       createdUserId = created.data.user.id
     }
 
-    const prendidos = modulesForPack(pack)
     const finished = await db().rpc('finish_installation', {
       owner_id: createdUserId,
       settings: {
@@ -194,8 +195,8 @@ installRoute.post('/finish', async (c) => {
         timezone,
         currency,
       },
-      module_rows: MODULES.map((m) => ({ key: m.key, enabled: m.available && prendidos.includes(m.key) })),
-      catalog_rows: body.seedDemo === true ? (SEEDS[pack] ?? []) : [],
+      module_rows: [],
+      catalog_rows: [],
     })
     if (finished.error) throw finished.error
 

@@ -32,7 +32,7 @@ GitHub Actions repite los controles en Windows y Linux. Esto no reemplaza las
 | Integración WAHA | `providers/waha.ts` |
 | Ritmo de envío | `workers/send-queue.ts`; conservar cola única y pausas |
 | Panel | `apps/panel/src/pages/`; componentes en `src/ui/` |
-| Packs y ejemplos | `packages/core/src/` |
+| Valores iniciales y extensiones históricas | `packages/core/src/` |
 | Base | Nueva migración numerada en `packages/db/migrations/` |
 
 Nunca edites una migración ya aplicada. Los generadores de SQL del servidor y

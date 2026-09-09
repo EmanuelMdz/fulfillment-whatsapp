@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Datos de demostración: conversaciones, pedidos y métricas de mentira,
+ * Datos de demostración: conversaciones, leads y métricas de mentira,
  * para ver el panel lleno antes de conectar un número.
  *
  *   npm run demo           carga cinco conversaciones de ejemplo
@@ -8,7 +8,7 @@
  *
  * Para qué sirve: mostrar el sistema en una clase o a un cliente sin
  * tener que inventar una charla en vivo, y entender cómo se ve cada
- * estado (el bot atendiendo, un chat derivado, un pedido esperando
+ * estado (el bot atendiendo, un chat derivado, un lead esperando
  * confirmación, una conversación cerrada).
  *
  * Solo para una base de aprendizaje. Los destinos demo: no son teléfonos
@@ -67,113 +67,55 @@ const hace = (ms) => new Date(Date.now() - ms).toISOString()
 /**
  * Las cinco conversaciones. Cada una muestra un estado distinto del
  * sistema, que es lo que hace falta explicar en una clase:
- * el bot solo, el bot que deriva, el pedido anotado, la persona que
+ * el bot solo, el bot que deriva, el link compartido, la persona que
  * tomó el control, y la conversación terminada.
  */
 const CHARLAS = [
   {
-    nombre: 'Lucía Ferrer',
-    telefono: `${PREFIJO}11`,
-    estado: 'humano',
-    hace: 3 * HORA,
-    // El caso completo: consulta, elección, confirmación y pedido anotado.
+    nombre: 'Lucía Ferrer', telefono: `${PREFIJO}11`, estado: 'bot', hace: 3 * HORA,
     mensajes: [
-      ['customer', 'Hola! vi la remera en instagram, tienen en negro?'],
-      ['bot', 'Hola! Sí, la tenemos en negro 🙌'],
-      ['bot', '¿Sabés qué talle usás? Si querés decime altura y peso y te ayudo a elegir.'],
-      ['customer', 'mido 1.68 y peso 62'],
-      ['bot', 'Con esa altura y peso te va perfecto el M.'],
-      ['bot', 'Sale $990. ¿Te la mando a domicilio o pasás a buscarla?'],
-      ['customer', 'a domicilio, vivo en pocitos'],
-      ['bot', 'Dale! El envío en Montevideo sale $250 y llega en 24 a 48 horas hábiles.'],
-      ['bot', 'Entonces sería: 1 remera negra talle M ($990) + envío ($250). ¿Te paso a anotarlo?'],
-      ['customer', 'si dale'],
-      ['bot', 'Listo, ya te lo anoté. El equipo lo confirma y te escribe por acá para coordinar 🙌'],
+      ['customer', 'Hola, quiero conocer cómo trabajan. Soy Lucía.'],
+      ['bot', 'Hola Lucía. ¿Qué te gustaría resolver?'],
+      ['customer', 'Quiero ordenar las consultas que llegan a mi equipo.'],
+      ['bot', 'Podés elegir un horario para conversar acá: https://example.invalid/agenda'],
     ],
-    revision: { reason: 'pedido_nuevo', detail: '1× Remera básica — $990\n1× Envío a domicilio — $250\nTotal: $1240' },
-    pedido: {
-      items: [
-        { name: 'Remera básica', qty: 1, unit_price: 990 },
-        { name: 'Envío a domicilio', qty: 1, unit_price: 250 },
-      ],
-      total: 1240,
-      stage: 'nuevo',
-      notes: 'Talle M, color negro. Envío a Pocitos.',
-    },
-    datos: { nombre_completo: 'Lucía Ferrer', direccion: 'Av. Brasil 2340 apto 701', ciudad: 'Montevideo' },
+    datos: { nombre_completo: 'Lucía Ferrer', interes: 'Organizar consultas', etapa: 'Link compartido' },
   },
-
   {
-    nombre: 'Martín Silva',
-    telefono: `${PREFIJO}22`,
-    estado: 'humano',
-    hace: 40 * MINUTO,
-    // El bot deriva porque se lo piden: el caso más común de la bandeja.
+    nombre: 'Martín Silva', telefono: `${PREFIJO}22`, estado: 'humano', hace: 40 * MINUTO,
     mensajes: [
-      ['customer', 'buenas, necesito una factura a nombre de mi empresa'],
-      ['bot', 'Hola! Para las facturas a nombre de una empresa te paso con el equipo, que lo maneja directo.'],
-      ['bot', 'Ya te escriben por acá 🙌'],
-      ['customer', 'perfecto gracias'],
+      ['customer', 'Prefiero hablar con alguien del equipo.'],
+      ['bot', 'Te paso con el equipo para continuar por acá.'],
     ],
-    revision: { reason: 'pedir_humano', detail: 'buenas, necesito una factura a nombre de mi empresa' },
+    revision: { reason: 'Solicita atención humana', detail: 'Prefiere conversar con una persona.' },
+    datos: { etapa: 'En atención' },
   },
-
   {
-    nombre: 'Sofía Rodríguez',
-    telefono: `${PREFIJO}33`,
-    estado: 'bot',
-    hace: 12 * MINUTO,
-    // El bot solo, sin derivar: la conversación que no necesita a nadie.
+    nombre: 'Sofía Rodríguez', telefono: `${PREFIJO}33`, estado: 'bot', hace: 12 * MINUTO,
     mensajes: [
-      ['customer', 'hola! la gorra viene en beige?'],
-      ['bot', 'Hola! Sí, la gorra viene en negro y en beige 🙌'],
-      ['bot', 'Es talle único con regulador atrás, y el bordado es al frente (no es estampado, así que no se descascara). Sale $690.'],
-      ['customer', 'buenisimo, la pienso y te aviso'],
-      ['bot', 'Dale, sin problema! Cualquier cosa me escribís por acá.'],
+      ['customer', '¿Me pasás información?'],
+      ['bot', 'Claro. ¿Qué te gustaría conocer?'],
     ],
-    seguimiento: { mensaje: '¿Pudiste pensar lo de la gorra beige? Quedan pocas de ese color 🙌', enHoras: 3 },
+    datos: { etapa: 'Consulta abierta' },
+    seguimiento: { mensaje: 'Retomo tu consulta: ¿qué información necesitás?', enHoras: 24 },
   },
-
   {
-    nombre: 'Diego Pereira',
-    telefono: `${PREFIJO}44`,
-    estado: 'humano',
-    hace: 26 * HORA,
-    // Una queja, y una persona que ya entró a atenderla: así se ve un
-    // chat donde el bot se calló solo.
+    nombre: 'Diego Pereira', telefono: `${PREFIJO}44`, estado: 'humano', hace: 26 * HORA,
     mensajes: [
-      ['customer', 'me llegó la gorra con una mancha'],
-      ['bot', 'Uf, perdón por eso. Te paso con el equipo para que lo resuelvan ya.'],
-      ['human', 'Hola Diego, soy Cami del local. Perdón por lo de la gorra.'],
-      ['human', 'Te la cambiamos sin cargo, ¿te queda cómodo que pasemos a buscarla mañana?'],
-      ['customer', 'si dale, mañana a la tarde estoy'],
+      ['customer', 'Tengo algunas preguntas sobre mi caso.'],
+      ['bot', 'Te paso con el equipo.'],
+      ['human', 'Hola Diego, contame qué necesitás y lo vemos.'],
     ],
-    revision: { reason: 'queja', detail: 'me llegó la gorra con una mancha', resuelto: true },
+    revision: { reason: 'Consulta para el equipo', detail: 'Atendiendo su caso.', resuelto: true },
+    datos: { etapa: 'En atención' },
   },
-
   {
-    nombre: 'Valentina Costa',
-    telefono: `${PREFIJO}55`,
-    estado: 'cerrado',
-    hace: 4 * DIA,
-    // Terminada: el pedido se entregó y el chat se cerró.
+    nombre: 'Valentina Costa', telefono: `${PREFIJO}55`, estado: 'cerrado', hace: 4 * DIA,
     mensajes: [
-      ['customer', 'hola, quiero 2 remeras blancas talle S'],
-      ['bot', 'Hola! Perfecto. 2 remeras blancas talle S son $1980.'],
-      ['bot', '¿Retirás en el local o te las mando?'],
-      ['customer', 'paso yo por el local'],
-      ['bot', 'Listo, ya te lo anoté. El equipo lo confirma y te escribe por acá 🙌'],
-      ['human', 'Hola Valentina! Confirmado, te esperamos. Estamos hasta las 19.'],
-      ['customer', 'genial, gracias!'],
+      ['customer', 'Gracias, encontré la información que necesitaba.'],
+      ['bot', 'Gracias por escribirnos.'],
     ],
-    pedido: {
-      items: [{ name: 'Remera básica', qty: 2, unit_price: 990 }],
-      total: 1980,
-      stage: 'completado',
-      notes: 'Talle S, blancas. Retira en el local.',
-      hace: 4 * DIA,
-    },
-    datos: { nombre_completo: 'Valentina Costa' },
+    datos: { nombre_completo: 'Valentina Costa', etapa: 'Consulta resuelta' },
   },
 ]
 
@@ -272,20 +214,6 @@ export async function sembrar(db) {
     }
 
     // ── Pedido ──
-    if (charla.pedido) {
-      const { error } = await db.from('orders').insert({
-        contact_id: contacto.id,
-        items: charla.pedido.items,
-        total: charla.pedido.total,
-        stage: charla.pedido.stage,
-        source: 'bot',
-        notes: charla.pedido.notes,
-        created_at: hace(charla.pedido.hace ?? charla.hace),
-      })
-      if (error) throw new Error(`pedido ${charla.nombre}: ${error.message}`)
-    }
-
-    // ── Seguimiento programado ──
     if (charla.seguimiento) {
       const { error } = await db.from('followups').insert({
         conversation_id: conv.id,

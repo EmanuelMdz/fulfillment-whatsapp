@@ -2,7 +2,7 @@
   "name": "fulfillment-whatsapp",
   "private": true,
   "version": "0.2.0",
-  "description": "Atencion y ventas por WhatsApp con IA. Un repo, un deploy, modulos que se prenden y se apagan.",
+  "description": "Motor de WhatsApp con IA, leads y seguimientos. El objetivo se define en el prompt.",
   "type": "module",
   "workspaces": [
     "apps/*",

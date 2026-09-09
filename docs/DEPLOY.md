@@ -48,10 +48,10 @@ ni se da cuenta de que el número se desconectó.
 3. **Settings → Networking → Generate Domain**. Esa es la URL de todo: del
    panel, del webhook y de la API.
 4. Abrí la URL. Las tablas ya se crearon al arrancar; el asistente te pide
-   el pack, el nombre del negocio, tu usuario, y los últimos 8 caracteres del
+   el nombre del negocio, tu usuario, y los últimos 8 caracteres del
    token (para confirmar que sos vos). Listo: entrás al panel.
    Empieza en **modo prueba**, sin números autorizados. Ya podés configurar
-   Studio, Catálogo y Probar el bot antes de crear WAHA.
+   Studio y Probar el bot antes de crear WAHA.
 
 ## 3. Railway — el puente de WhatsApp (WAHA)
 
@@ -91,8 +91,8 @@ El puente es el servicio que maneja la sesión de WhatsApp Web. Va en el
    gratis ni acceso a todos los modelos; verificá la cuenta y la facturación.
 4. Panel → **Studio**: elegí el grupo de avisos del equipo (aparece la lista
    de grupos del número conectado).
-5. Probá tu prompt y catálogo en **Probar el bot**. Después seguí
-   [PRUEBAS.md](PRUEBAS.md) con teléfonos reales. Quitá los ejemplos y apagá
+5. Probá tu objetivo y los seguimientos en **Probar el bot**. Después seguí
+   [PRUEBAS.md](PRUEBAS.md) con teléfonos reales. Revisá los links y apagá
    el modo prueba cuando todas las verificaciones estén completas.
 
 ---

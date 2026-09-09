@@ -10,7 +10,7 @@ import { Button, Card, Notice, PageHeader, Textarea } from '../ui'
  *
  * Debajo de cada respuesta se ve lo que en producción es invisible: si
  * hubiera derivado (y por qué), qué datos hubiera guardado en la ficha
- * y qué pedido hubiera armado. Es la mejor forma de afinar los prompts
+ * y qué datos del lead guardaría. Es la mejor forma de afinar los prompts
  * y la ficha del catálogo antes de conectar el número.
  *
  * Dos herramientas más: "Lo que lee la IA" muestra el prompt completo
@@ -52,7 +52,6 @@ export default function TestChat() {
       const meta = {
         derivar: r.decision.escalateReason,
         datos: r.decision.data,
-        pedido: r.decision.order,
       }
       if (respuesta.length) respuesta[respuesta.length - 1].meta = meta
       setMensajes([...historia, ...respuesta])
@@ -147,11 +146,10 @@ export default function TestChat() {
             {mensajes.map((m, i) => (
               <div key={i} className={clsx('bubble', m.role === 'user' ? 'bubble-in' : 'bubble-out')}>
                 {m.content}
-                {m.meta && (m.meta.derivar || m.meta.datos || m.meta.pedido) && (
+                {m.meta && (m.meta.derivar || m.meta.datos) && (
                   <span className="bubble-meta">
                     {m.meta.derivar ? `derivaría: ${m.meta.derivar} · ` : ''}
                     {m.meta.datos ? `ficha: ${Object.keys(m.meta.datos).join(', ')} · ` : ''}
-                    {m.meta.pedido ? `pedido: ${m.meta.pedido.items.length} item(s)` : ''}
                   </span>
                 )}
               </div>
@@ -164,7 +162,6 @@ export default function TestChat() {
                   <li key={i} className="rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-[13.5px]">
                     <span className="font-semibold text-ink">En {s.en_horas} h</span>{' '}
                     <span className="text-ink-3">({cuando(s.cuando)})</span>
-                    {s.fallback && <span className="text-ink-3"> · horas inventadas por el modelo, se usó el fallback</span>}
                     <span className="mt-1 block text-ink-2">{s.mensaje}</span>
                   </li>
                 ))}

@@ -1,54 +1,28 @@
 # Tu primera instalación
 
-El objetivo inicial es ver al bot responder en el simulador con información de
-tu negocio. Para ese resultado no necesitás conectar WhatsApp todavía.
+El primer resultado es una conversación en el simulador guiada por tu prompt.
+Todavía no necesitás vincular WhatsApp.
 
-## 1. Creá tu copia
+## 1. Duplicá el repo
 
-1. Entrá al repo en GitHub con tu cuenta.
-2. Elegí **Fork → Create fork**. Si el autor habilitó **Use this template**,
-   también podés crear tu copia con ese botón.
-3. Confirmá que arriba aparece **tu usuario / nombre del repo**. Los cambios
-   y el despliegue se hacen desde esa copia.
-
-Un fork conserva el vínculo con el original para recibir actualizaciones.
-Descargar un ZIP sirve para leer o probar código, pero no te deja conectado al
-flujo de despliegue de GitHub.
+En GitHub elegí **Fork → Create fork**, o **Use this template** si está habilitado.
+Confirmá que estás trabajando en tu copia.
 
 ## 2. Prepará las cuentas
 
-- **Supabase:** un proyecto nuevo y vacío, dedicado a esta instalación. Guardá
-  la contraseña de la base en tu gestor; no es la contraseña del panel.
-- **GitHub y Railway:** para el camino publicado. Railway necesita acceso a tu copia.
-- **Proveedor de IA:** una clave de Gemini u OpenAI con acceso a su API.
+Creá un proyecto nuevo y vacío de Supabase, dedicado a esta instalación.
+Prepará tu cuenta de Railway y una clave de Gemini u OpenAI con acceso a su API.
+Las variables y el modo manual están en [DEPLOY.md](DEPLOY.md).
 
-Los costos y las variables están en [DEPLOY.md](DEPLOY.md). Evitá reutilizar
-el Supabase de otro proyecto: el instalador crea tablas y configura Auth.
+## 3. Instalá
 
-## 3. Elegí dónde ejecutarlo
+En Railway, seguí los pasos 1 y 2 de [Deploy](DEPLOY.md).
 
-### Railway
-
-Seguí [DEPLOY.md, pasos 1 y 2](DEPLOY.md). Al terminar tenés una URL que abre el
-asistente. Podés completar el panel y el simulador antes de crear WAHA.
-
-### En tu computadora
-
-Instalá Git y [Node.js 24 LTS](https://nodejs.org/en/download). Volvé a abrir la
-terminal después de instalarlos. En Windows usá PowerShell; en macOS/Linux,
-Terminal. Estos comandos funcionan en los tres.
-
-En tu fork, botón **Code → HTTPS**, copiá la dirección y usala en lugar de
-`URL_DE_TU_FORK`:
+En tu computadora, con Git y Node.js 24:
 
 ```bash
-git clone URL_DE_TU_FORK
-```
-
-Entrá a la carpeta creada (`cd nombre-del-repo`). Debés ver `package.json`,
-`README.md` y `.env.example`. Ejecutá:
-
-```bash
+git clone URL_DE_TU_COPIA
+cd nombre-del-repo
 npm ci
 npm run setup
 npm run build
@@ -56,73 +30,53 @@ npm run doctor
 npm run dev
 ```
 
-`setup` prepara `.env` y pide las variables que falten. Si usás el modo manual,
-copiá `.env.example` a `.env` con tu editor y cargá las claves indicadas allí.
-No compartas esa terminal mientras ingresás el token. `.env` no se sube a GitHub.
-
-**Resultado esperado:** `doctor` muestra los controles en `OK`; el servidor
-imprime que escucha en localhost:3000. Abrí esa dirección y dejá la terminal
-corriendo. Para detener solo este servidor, `Ctrl+C` en esa misma terminal.
-
-`doctor` comprueba formatos y archivos. El acceso a Supabase se verifica al
-arrancar y en el asistente. Si modificás el panel, volvé a compilar o ejecutá
-`npm run dev:panel` en otra terminal y abrí la URL que muestra Vite.
+Abrí http://localhost:3000. No levantes otro bot contra una base que ya usa Railway.
 
 ## 4. Completá el asistente
 
-1. Elegí **General**, salvo que necesites las palabras iniciales de otro pack.
-2. Escribí el nombre del negocio, zona horaria y símbolo de moneda.
-3. Para aprender, podés cargar el catálogo de ejemplo. Sus precios y fichas son
-   ficticios: reemplazalos antes de habilitar atención real.
-4. Creá el usuario del dueño con email y contraseña de al menos ocho caracteres.
-5. Pegá **solo los últimos ocho caracteres** del token cargado en el hosting.
-   En modo manual, el asistente usa el código incluido en el SQL.
+Ingresá nombre del negocio, zona horaria y tu email y contraseña.
+Para verificar que sos el dueño, pegá los últimos ocho caracteres del token
+cargado en el hosting. En modo manual, el asistente usa el código del SQL.
 
-**Resultado esperado:** podés entrar y el panel muestra modo prueba. Todavía
-no responde a ningún teléfono. Si hubo un error durante la instalación,
-verificá el estado y reintentá con el mismo correo; no crees otro proyecto
-por un error transitorio.
+El panel empieza en modo prueba, sin números autorizados. No hay packs ni
+catálogo para elegir.
 
-## 5. Conseguí la primera respuesta
+## 5. Escribí tu prompt
 
-1. **Studio:** cargá la clave, elegí proveedor/modelo y tocá **Probar clave y modelo**.
-2. **Studio → Prompt:** describí tu negocio. Usá [PROMPTS.md](PROMPTS.md).
-3. **Catálogo:** cargá al menos un producto o servicio con precio y ficha.
-4. **Probar el bot:** preguntá por ese ítem, por algo fuera del catálogo y cómo
-   hablar con una persona. Revisá la decisión que muestra el simulador.
+En **Studio**, cargá la clave de IA y probá el modelo.
+Después escribí el prompt siguiendo [PROMPTS.md](PROMPTS.md):
 
-**Resultado esperado:** una respuesta basada en tu catálogo y una derivación
-cuando corresponde. El simulador consume la API de IA, pero no envía WhatsApp,
-no crea pedidos ni programa seguimientos reales.
+- Qué debe conseguir el agente.
+- Qué información y links puede usar.
+- Qué datos debe pedir y guardar.
+- Cuándo pasar a una persona.
+- Si hace seguimientos, cuántos y en qué momentos.
 
-Para recorrer el panel con datos ficticios: `npm run demo`, solo en la base
-de aprendizaje. La demo no reemplaza esta prueba de la IA.
+El prompt inicial no programa seguimientos hasta que definas sus reglas.
 
-## 6. Vinculá WhatsApp y validá
+## 6. Probá
 
-Seguí [DEPLOY.md, pasos 3 y 4](DEPLOY.md) y [PRUEBAS.md](PRUEBAS.md). Cargá el
-número del teléfono que va a hacer de cliente en **Conexión → Modo prueba**
-antes de escanear el QR del negocio.
+En **Probar el bot**, conversá como un lead. Revisá la respuesta, la ficha y
+la derivación que propone. Probá también los seguimientos.
+El simulador usa la API de IA, pero no guarda leads ni envía mensajes reales.
 
-Conservá el modo prueba hasta verificar todo. Apagarlo permite que el bot
-atienda a personas fuera de esa lista; hacelo cuando catálogo, prompt y equipo
-estén listos. La comparación usa los últimos ocho dígitos del teléfono:
-preferí cargar siempre código de país y número completo.
+Opcional: `npm run demo` carga cinco ejemplos ficticios en una base ya instalada.
+
+## 7. Conectá WhatsApp
+
+Seguí los pasos 3 y 4 de [Deploy](DEPLOY.md).
+Antes de escanear el QR del número dedicado, agregá el teléfono que hará de
+lead en **Conexión → Modo prueba**. Conservá el modo prueba durante
+[las verificaciones](PRUEBAS.md).
 
 ## Si te acompaña una IA
 
-Pegá esto en tu herramienta, con el repo abierto:
-
 ```text
-Leé README.md, docs/PRIMEROS_PASOS.md, docs/GUIA.md y docs/PROMPTS.md.
-Quiero instalar mi copia y probarla antes de conectar un número real.
-Mi negocio es: [describilo]. Mi nivel técnico es: [contalo].
-Guiame un paso por vez y decime el resultado esperado de cada paso.
-Priorizá configurar desde el panel. No copies claves en archivos versionados
-ni uses conversaciones reales como ejemplos. Conservá el modo prueba hasta
-que complete docs/PRUEBAS.md. No arranques servicios duplicados contra mi base.
+Leé README.md, docs/GUIA.md y docs/PROMPTS.md.
+Quiero adaptar mi agente de WhatsApp.
+Mi negocio es: [...]
+El objetivo del agente es: [...]
+Guiame un paso por vez. Definí el objetivo, los datos y los seguimientos
+en el prompt. Conservá el modo prueba y no arranques servicios duplicados
+contra mi base.
 ```
-
-Si algo falla, [OPERACION.md](OPERACION.md) tiene la tabla de diagnóstico.
-Al pedir ayuda, indicá el paso, el error sin secretos, tu sistema operativo y
-el commit del repo. No pegues tokens, claves, QR ni conversaciones de clientes.

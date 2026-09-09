@@ -1,55 +1,41 @@
-# Fulfillment · Ainnovate
+# Motor de WhatsApp · Ainnovate
 
-Un asistente de atención por WhatsApp que consulta tu catálogo, reúne datos,
-anota pedidos y deriva a una persona. Incluye el bot y un panel para configurar
-el negocio, probar la IA y atender conversaciones.
+Una base para crear tu propio agente: responde mensajes, guarda leads,
+mantiene las conversaciones y programa seguimientos. **Su objetivo se define
+en un único prompt editable**, en Studio.
 
-**Tu primer resultado:** instalar el panel y probar una conversación con tu
-catálogo, antes de vincular un número. Después, conectar WhatsApp en modo
-prueba y verificar el circuito completo.
+Podés orientarlo a responder preguntas, calificar contactos, compartir un link
+de agenda o entregar información. La instalación inicial no pide un catálogo,
+no crea pedidos ni elige un rubro.
 
-**Empezá por [PRIMEROS_PASOS.md](docs/PRIMEROS_PASOS.md).** Está escrito para
-alguien que duplica el repo por primera vez, con o sin ayuda de una IA.
+## Primer resultado
 
-## Qué incluye hoy
+Seguí [Primeros pasos](docs/PRIMEROS_PASOS.md): duplicar → instalar →
+escribir tu prompt → probar en el simulador → conectar WhatsApp en modo prueba.
 
-- Conexión por QR mediante WAHA; mensajes de texto y toma de control humana.
-- Catálogo, ficha del contacto, pedidos pendientes de confirmación y revisión.
+## Qué incluye
+
+- WhatsApp por QR mediante WAHA.
+- Conversaciones, respuesta humana y devolución al bot.
+- Leads con una ficha de datos definida por el prompt.
+- Etapas libres: indicá en el prompt cuándo guardar el dato `etapa`.
 - Un prompt editable, simulador de conversación y prueba de seguimientos.
-- Avisos al equipo, métricas, usuarios y modo prueba con números autorizados.
-- Instalador web y migraciones automáticas con Supabase.
+- Seguimientos con contenido, cantidad y cadencia definidos en el prompt.
+- Revisión y avisos al equipo, métricas, usuarios y modo prueba.
+- Instalador web y migraciones de Supabase.
 
-| Punto de partida | Palabras y etapas iniciales |
-|---|---|
-| General | Clientes, catálogo, pedidos |
-| Ecommerce | Clientes, productos, ventas |
-| Servicios | Pacientes, prestaciones, consultas |
-
-Los tres usan el mismo código. Los nombres, estados y motivos se cambian desde
-Ajustes. **Inventario, cobros, transcripción de audios, interpretación de fotos,
-envíos, horarios por franja y asignación de casos todavía no están implementados.**
-El pack Servicios registra solicitudes; no incluye una agenda con disponibilidad.
-Un pedido anotado necesita confirmación humana.
+El motor valida el formato, conserva el historial, organiza las colas y aplica
+los controles de envío. El prompt define qué conseguir y cómo conversar.
+Compartir un link no ejecuta acciones en una agenda, formulario o sitio externo;
+esas integraciones se pueden desarrollar sobre esta base.
 
 ## Qué necesitás
 
-| Para qué | Requisito |
-|---|---|
-| Guardar datos y entrar al panel | Un proyecto nuevo de Supabase por negocio |
-| Probar la IA | Una clave propia de Gemini u OpenAI con acceso al modelo elegido |
-| Publicar | GitHub y Railway; bot siempre encendido, una sola réplica |
-| Vincular WhatsApp | Servicio WAHA con volumen persistente y un número dedicado |
-| Trabajar en tu computadora | Git y Node.js **24 LTS**, con npm |
+Un proyecto nuevo de Supabase, GitHub y Railway para publicar, una clave de IA
+propia y WAHA con un número dedicado para WhatsApp.
+Para trabajar localmente: Git, Node.js **24** y npm.
 
-El costo de operar el sistema depende de hosting, IA y número: consultá
-[DEPLOY.md](docs/DEPLOY.md). WAHA es un puente no oficial y puede perder la
-sesión o sufrir bloqueos; las pausas no garantizan que el número quede protegido.
-
-## Elegí un recorrido
-
-**Sin terminal:** duplicá el repo en GitHub y seguí [el despliegue en Railway](docs/DEPLOY.md).
-
-**En tu computadora:** abrí una terminal en tu copia del repo y ejecutá uno por uno:
+**En tu computadora**, dentro de tu copia:
 
 ```bash
 npm ci
@@ -59,58 +45,39 @@ npm run doctor
 npm run dev
 ```
 
-Abrí [http://localhost:3000](http://localhost:3000). El asistente crea el negocio
-y tu usuario. Necesitás la URL del proyecto de Supabase y su token de acceso;
-la guía explica dónde encontrarlos y el [modo sin token de cuenta](docs/DEPLOY.md#modo-manual-sin-token-de-cuenta).
+Abrí http://localhost:3000 y completá el asistente con tu negocio y usuario.
+La URL de Supabase y el token de acceso se explican en [Deploy](docs/DEPLOY.md),
+junto con el modo manual con claves de proyecto.
 
-El bot empieza **en modo prueba**, sin números autorizados. Primero Studio →
-clave y prompt; luego Catálogo → tus fichas; después Probar el bot. Para usar
-WhatsApp seguí [Conectar y probar](docs/PRUEBAS.md).
+Primero Studio → clave y prompt → Probar el bot. Después configurá WhatsApp
+en modo prueba y autorizá el teléfono que hará de lead.
 
-No ejecutes el bot local y el desplegado contra la misma base al mismo tiempo:
-serían dos trabajadores enviando mensajes. Usá un proyecto de aprendizaje aparte.
+Una instalación es un negocio: una base, un bot y un puente. No ejecutes el bot
+local y el publicado contra la misma base al mismo tiempo. WAHA es un puente
+no oficial; la sesión puede desconectarse o el número sufrir bloqueos.
 
-## Comandos útiles
+## Comandos
 
 | Comando | Resultado |
 |---|---|
-| `npm run doctor` | Diagnóstico local de Node, variables y build; no contacta cuentas ni imprime claves |
-| `npm run check` | Tests aislados, TypeScript y compilación del panel y servidor |
-| `npm run dev:panel` | Panel con recarga; requiere el bot en localhost:3000 |
-| `npm run demo` | Cinco conversaciones ficticias en una base de aprendizaje ya instalada |
-| `npm run demo:limpiar` | Quita exclusivamente la demo nueva marcada |
+| `npm run check` | Tests aislados, TypeScript y compilación |
+| `npm run doctor` | Diagnóstico local sin contactar cuentas ni imprimir claves |
+| `npm run demo` | Cinco conversaciones y leads ficticios en una base de aprendizaje instalada |
+| `npm run demo:limpiar` | Quita exclusivamente los datos marcados de la demo |
 | `npm run prompt:pull` | Copia el prompt de Studio a `prompts/negocio.md` |
 | `npm run prompt:push` | Reemplaza el prompt de Studio por el archivo local |
-| `npm run db:sql` | Muestra las migraciones; para guardarlas sin texto de npm: `node scripts/db-sql.mjs > instalar.sql` |
+| `npm run db:sql` | Muestra el SQL de instalación y actualización |
 
-La demo visual no necesita WAHA ni IA, pero sí Supabase y haber terminado el
-asistente. Sus chats no envían mensajes y sus seguimientos quedan cancelados.
+La demo no usa IA ni envía mensajes; requiere Supabase y el asistente terminado.
+Sus seguimientos quedan cancelados.
 
-## Documentación
+## Guías
 
-1. [Primeros pasos](docs/PRIMEROS_PASOS.md): de duplicar el repo a la primera prueba.
-2. [Deploy](docs/DEPLOY.md): cuentas, variables, volumen y conexión.
-3. [Adaptar un negocio](docs/GUIA.md) y [escribir su prompt](docs/PROMPTS.md).
-4. [Pruebas de entrega](docs/PRUEBAS.md): verificaciones con teléfonos reales.
-5. [Operación y recuperación](docs/OPERACION.md): actualizar, respaldar y resolver problemas.
-6. [Desarrollar](CONTRIBUTING.md): arquitectura y controles del repo.
+- [Primeros pasos](docs/PRIMEROS_PASOS.md) y [Deploy](docs/DEPLOY.md).
+- [Adaptar el agente](docs/GUIA.md) y [escribir el prompt](docs/PROMPTS.md).
+- [Pruebas](docs/PRUEBAS.md) y [Operación](docs/OPERACION.md).
+- [Desarrollar](CONTRIBUTING.md) y [estado de lanzamiento](docs/LANZAMIENTO.md).
 
-Para el autor: [estado de lanzamiento y pendientes](docs/LANZAMIENTO.md).
-[PLAN](docs/PLAN.md), [PORTEO](docs/PORTEO.md), [AUDITORIA](docs/AUDITORIA.md) y
-[TEMARIO](docs/TEMARIO.md) conservan contexto histórico; no son instrucciones
-de instalación ni una promesa de funciones disponibles.
-
-## Estructura
-
-```text
-apps/bot/       API Hono + TypeScript, instalador, webhooks y trabajadores
-apps/panel/     React + Vite + Tailwind; compila dentro de apps/bot/public
-packages/core/  packs, catálogo de ejemplo y utilidades compartidas
-packages/db/    migraciones de Postgres
-scripts/        instalación local, diagnóstico, demo y prompts
-tests/          pruebas sin credenciales; Postgres en memoria y APIs simuladas
-docs/           guías para instalar, adaptar y operar
-```
-
-Una instalación es un negocio: una base, un bot y un puente. El panel y la API
-se publican juntos; WAHA es el segundo servicio del proyecto de Railway.
+El código y las tablas de catálogo/pedidos de versiones anteriores se conservan
+como material para futuras extensiones; están fuera del motor y del panel inicial.
+PLAN, PORTEO, AUDITORIA y TEMARIO son contexto histórico, no el alcance actual.

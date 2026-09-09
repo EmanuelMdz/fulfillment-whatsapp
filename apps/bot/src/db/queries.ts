@@ -294,7 +294,7 @@ export interface AppConfig {
 
 /** Los valores de una instalación recién creada. También son el piso si una columna falta. */
 export const DEFAULT_CONFIG: AppConfig = {
-  pack: 'ecommerce',
+  pack: 'agent',
   business_name: '',
   timezone: 'UTC',
   labels: {},
@@ -474,11 +474,14 @@ export async function scheduleFollowup(
   conversationId: string,
   message: string,
   scheduledAtIso: string,
-): Promise<void> {
-  const res = await db()
-    .from('followups')
-    .insert({ conversation_id: conversationId, message, scheduled_at: scheduledAtIso })
+  inboundId: string | null,
+): Promise<boolean> {
+  const res = await db().rpc('schedule_followup_if_current', {
+    conversation_uuid: conversationId, inbound_id: inboundId,
+    followup_message: message, due_at: scheduledAtIso,
+  })
   if (res.error) throw res.error
+  return res.data === true
 }
 
 /**
@@ -584,34 +587,20 @@ export async function findOpenBotOrder(
 
 // ── Ficha del contacto ───────────────────────────────────────
 
-/**
- * Mergea los datos que la IA fue juntando en la conversación (nombre,
- * dirección, lo que sea) dentro de `contacts.collected`. Es la ficha que
- * pre-llena el formulario cuando se crea un pedido desde el chat.
- *
- * Lo nuevo pisa lo viejo clave por clave — el cliente que corrige su
- * dirección tres veces se queda con la última, no con la primera.
- * Y si el contacto todavía no tiene nombre, lo bautiza con el real.
- */
+/** Información persistida del lead para dar contexto a respuestas y seguimientos. */
+export async function getLeadProfile(contactId: string | null): Promise<Record<string, unknown> | null> {
+  if (!contactId) return null
+  const res = await db().from('contacts').select('name, collected').eq('id', contactId).maybeSingle()
+  if (res.error) throw res.error
+  return res.data
+}
+
+/** Fusiona los datos nuevos sin perder otras claves si el equipo escribe a la vez. */
 export async function mergeCollectedData(
   contactId: string,
   data: Record<string, string>,
 ): Promise<void> {
-  const actual = await db()
-    .from('contacts')
-    .select('name, collected')
-    .eq('id', contactId)
-    .maybeSingle()
-  if (actual.error) throw actual.error
-  if (!actual.data) return
-
-  const merged = { ...((actual.data.collected as Record<string, string>) ?? {}), ...data }
-  const cambios: Record<string, unknown> = { collected: merged }
-  if (data.nombre_completo && !(actual.data.name as string)?.trim()) {
-    cambios.name = data.nombre_completo
-  }
-
-  const res = await db().from('contacts').update(cambios).eq('id', contactId)
+  const res = await db().rpc('merge_lead_data', { lead_id: contactId, new_data: data })
   if (res.error) throw res.error
 }
 

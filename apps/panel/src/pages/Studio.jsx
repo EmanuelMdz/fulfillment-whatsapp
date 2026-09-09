@@ -30,7 +30,7 @@ const ZONAS = (() => {
 
 const MODELO_SUGERIDO = { gemini: 'gemini-2.5-flash', openai: 'gpt-4.1-mini' }
 
-const SECCIONES_SUGERIDAS = ['## Quién sos', '## Datos del negocio', '## Reglas', '## Cuándo derivar', '## Cómo cerrar', '## Seguimientos']
+const SECCIONES_SUGERIDAS = ['## Quién sos', '## Datos del negocio', '## Reglas', '## Cuándo derivar', '## Objetivo', '## Datos del lead', '## Seguimientos']
 
 export default function Studio() {
   const [prompt, setPrompt] = useState(null) // la fila 'sistema' de la tabla prompts
@@ -207,8 +207,7 @@ export default function Studio() {
                     {i < SECCIONES_SUGERIDAS.length - 1 ? ' ' : ''}
                   </span>
                 ))}
-                . Lo que se vende NO va acá: va en el catálogo. El sistema agrega abajo la fecha, el catálogo, los
-                motivos y el formato de respuesta; los dos botones de arriba muestran el resultado completo.
+                . Definí acá el objetivo, la información, los links, qué datos guardar, cuándo derivar y la cadencia de seguimiento. Podés cambiar de caso de uso editando este texto.
               </p>
               <div className={vista ? 'grid gap-4 xl:grid-cols-2' : ''}>
                 <Textarea
@@ -244,7 +243,7 @@ export default function Studio() {
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
           <Card title="Negocio" subtitle="Cómo se presenta el bot y a quién avisa">
             <div className="grid gap-4">
-              <Field label="Nombre del negocio (la IA se presenta con esto)">
+              <Field label="Nombre del negocio">
                 <Input
                   value={config.business_name ?? ''}
                   onChange={(e) => setConfig({ ...config, business_name: e.target.value })}

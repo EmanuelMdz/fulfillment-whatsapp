@@ -53,18 +53,8 @@ export default function Conversaciones() {
   const [searchParams, setSearchParams] = useSearchParams()
   const seleccionada = searchParams.get('chat')
   const [verFicha, setVerFicha] = useState(false)
-  const [ficha, setFicha] = useState(null) // {contacto, pedidos}
-  const [moneda, setMoneda] = useState('$')
+  const [ficha, setFicha] = useState(null) // Ficha del lead
   const finHilo = useRef(null)
-
-  useEffect(() => {
-    supabase
-      .from('app_config')
-      .select('currency')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => setMoneda(data?.currency || '$'))
-  }, [])
 
   const conv = lista.find((c) => c.id === seleccionada) ?? null
 
@@ -116,22 +106,12 @@ export default function Conversaciones() {
     }
     setVerFicha(true)
     if (!conv?.contact_id) {
-      setFicha({ contacto: null, pedidos: [] })
+      setFicha({ contacto: null })
       return
     }
-    const [contactoRes, pedidosRes] = await Promise.all([
-      supabase.from('contacts').select('*').eq('id', conv.contact_id).maybeSingle(),
-      supabase
-        .from('orders')
-        .select('id, items, total, stage, created_at')
-        .eq('contact_id', conv.contact_id)
-        .order('created_at', { ascending: false })
-        .limit(10),
-    ])
-    setFicha({
-      contacto: contactoRes.data ?? null,
-      pedidos: pedidosRes.data ?? [],
-    })
+    const { data, error } = await supabase.from('contacts').select('*').eq('id', conv.contact_id).maybeSingle()
+    if (error) setError(error.message)
+    setFicha({ contacto: data ?? null })
   }
 
   useEffect(() => {
@@ -273,38 +253,19 @@ export default function Conversaciones() {
                     <>
                       <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-[13.5px]">
                         <dt className="text-ink-3">Nombre</dt>
-                        <dd className="text-ink">{ficha.contacto.name?.trim() || '—'}</dd>
+                        <dd className="min-w-0 break-words text-ink">{ficha.contacto.name?.trim() || '—'}</dd>
                         <dt className="text-ink-3">Teléfono</dt>
-                        <dd className="text-ink">{ficha.contacto.phone || '—'}</dd>
+                        <dd className="min-w-0 break-words text-ink">{ficha.contacto.phone || '—'}</dd>
                         {Object.entries(ficha.contacto.collected ?? {}).map(([k, v]) => (
                           <span key={k} className="contents">
                             <dt className="text-ink-3">{k.replace(/_/g, ' ')}</dt>
-                            <dd className="text-ink">{String(v)}</dd>
+                            <dd className="min-w-0 break-words text-ink">{String(v)}</dd>
                           </span>
                         ))}
                       </dl>
                       <p className="mt-3 text-[12.5px] text-ink-3">
                         Los datos los junta la IA conversando; se corrigen solos cuando el cliente los corrige.
                       </p>
-                      <h2 className="mt-6 text-[15px] font-bold text-ink">Pedidos</h2>
-                      {ficha.pedidos.length === 0 && <p className="mt-2 text-[13px] text-ink-3">Ninguno todavía.</p>}
-                      <ul className="mt-2 grid gap-2">
-                        {ficha.pedidos.map((p) => (
-                          <li key={p.id} className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13.5px]">
-                            <span className="font-semibold text-ink">
-                              {moneda}
-                              {p.total}
-                            </span>
-                            <span className="text-ink-3">
-                              {' '}
-                              · {p.stage} · {new Date(p.created_at).toLocaleDateString('es-UY')}
-                            </span>
-                            <span className="mt-0.5 block text-ink-2">
-                              {Array.isArray(p.items) ? p.items.map((i) => `${i.qty ?? 1}× ${i.name ?? '?'}`).join(' · ') : '—'}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
                     </>
                   )}
                 </div>

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ClipboardList, Inbox, MessageSquare, Send } from 'lucide-react'
+import { ContactRound, Inbox, MessageSquare, Send } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
-import { AreaTrend, Badge, Button, Card, EmptyState, Kpi, Notice, PageHeader, Table, WhatsappIcon } from '../ui'
+import { AreaTrend, Badge, Button, Card, EmptyState, Kpi, Notice, PageHeader, WhatsappIcon } from '../ui'
 
 /**
  * Métricas de los últimos 7 días: cuatro números con sus barritas por
  * día, la curva de respuestas del bot, lo que está en revisión ahora y
- * los últimos pedidos. Todo sale de las tablas y del registro de eventos.
+ * los leads nuevos. Todo sale de las tablas y del registro de eventos.
  */
 
 const DIAS = 7
@@ -51,7 +51,7 @@ export default function Metricas() {
     const dias = ultimosDias()
     const desde = new Date(Date.now() - DIAS * DIA_MS).toISOString()
     async function cargar() {
-      const [eventos, chats, pedidos, revision, config] = await Promise.all([
+      const [eventos, chats, leads, revision, config] = await Promise.all([
         supabase
           .from('event_log')
           .select('event_type, created_at')
@@ -59,17 +59,12 @@ export default function Metricas() {
           .gte('created_at', desde)
           .limit(5000),
         supabase.from('conversations').select('created_at').gte('created_at', desde),
-        supabase
-          .from('orders')
-          .select('id, total, stage, source, created_at, items, contacts(name, phone)')
-          .order('created_at', { ascending: false })
-          .limit(8),
+        supabase.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', desde),
         supabase.from('review_queue').select('id, reason, detail, conversation_id, created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(6),
-        supabase.from('app_config').select('currency, order_stages, escalation_reasons, labels').eq('id', 1).maybeSingle(),
+        supabase.from('app_config').select('escalation_reasons').eq('id', 1).maybeSingle(),
       ])
       const ev = eventos.data ?? []
       const tipo = (t) => ev.filter((e) => e.event_type === t)
-      const pedidosBot = (pedidos.data ?? []).filter((p) => p.source === 'bot' && p.created_at >= desde)
       setDatos({
         dias,
         chats: porDia(chats.data ?? [], dias),
@@ -77,14 +72,9 @@ export default function Metricas() {
         derivaciones: porDia(tipo('review.queued'), dias),
         seguimientos: porDia(tipo('followup.sent'), dias),
         caidos: tipo('turn.failed').length,
-        pedidosBot: pedidosBot.length,
-        pedidosTotal: pedidosBot.reduce((s, p) => s + (p.total ?? 0), 0),
-        ultimosPedidos: pedidos.data ?? [],
+        leads: leads.count ?? 0,
         revision: revision.data ?? [],
-        moneda: config.data?.currency || '$',
-        etapas: Object.fromEntries((config.data?.order_stages ?? []).map((e) => [e.key, e])),
         motivos: Object.fromEntries((config.data?.escalation_reasons ?? []).map((m) => [m.key, m.label])),
-        labels: config.data?.labels ?? {},
       })
     }
     cargar()
@@ -94,45 +84,6 @@ export default function Metricas() {
 
   const suma = (s) => s.reduce((a, b) => a + b, 0)
   const curva = datos.dias.map((d, i) => ({ dia: d.dia, valor: datos.respuestas[i] }))
-  const nombrePedidos = datos.labels.order_plural ?? 'Pedidos'
-
-  const columnasPedidos = [
-    {
-      key: 'contacto',
-      label: 'Contacto',
-      render: (p) => <span className="font-semibold text-ink">{p.contacts?.name?.trim() || p.contacts?.phone || 'Sin contacto'}</span>,
-    },
-    {
-      key: 'items',
-      label: 'Detalle',
-      render: (p) => (
-        <span className="text-ink-2">
-          {Array.isArray(p.items) && p.items.length ? p.items.map((i) => `${i.qty ?? 1}× ${i.name ?? '?'}`).join(' · ') : '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'total',
-      label: 'Total',
-      align: 'right',
-      render: (p) => (
-        <span className="font-semibold tabular-nums text-ink">
-          {datos.moneda}
-          {p.total}
-        </span>
-      ),
-    },
-    {
-      key: 'stage',
-      label: 'Etapa',
-      align: 'right',
-      render: (p) => {
-        const etapa = datos.etapas[p.stage]
-        return <Badge tone={etapa?.final ? 'blue' : 'yellow'}>{etapa?.label ?? p.stage}</Badge>
-      },
-    },
-  ]
-
   return (
     <>
       <PageHeader title="Métricas" subtitle="Los últimos 7 días. Si algo se está rompiendo, se ve acá primero." />
@@ -163,12 +114,11 @@ export default function Metricas() {
           note="Turnos contestados por la IA"
         />
         <Kpi
-          icon={ClipboardList}
+          icon={ContactRound}
           tone="orange"
-          label={`${nombrePedidos} del bot`}
-          value={datos.pedidosBot}
-          delta={datos.pedidosTotal ? { text: `${datos.moneda}${datos.pedidosTotal}`, tone: 'neutral' } : null}
-          note="Anotados por la IA, esperando confirmación o ya confirmados"
+          label="Leads nuevos"
+          value={datos.leads}
+          note="Contactos que llegaron esta semana"
         />
         <Kpi
           icon={Inbox}
@@ -222,21 +172,6 @@ export default function Metricas() {
         </Card>
       </div>
 
-      <Card
-        className="mt-5"
-        title={`Últimos ${nombrePedidos.toLowerCase()}`}
-        actions={
-          <Button size="sm" to="/pedidos">
-            Ver todos
-          </Button>
-        }
-      >
-        {datos.ultimosPedidos.length === 0 ? (
-          <EmptyState icon={AlertTriangle} title="Todavía no hay pedidos" text="Cuando el bot anote uno, aparece acá." />
-        ) : (
-          <Table columns={columnasPedidos} rows={datos.ultimosPedidos} />
-        )}
-      </Card>
     </>
   )
 }
