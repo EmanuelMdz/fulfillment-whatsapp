@@ -1,0 +1,19 @@
+# Lo que NO entra en la imagen. Sin esto, `COPY . .` se lleva el
+# node_modules de tu máquina (que puede tener binarios de otro sistema
+# operativo) y cualquier .env con claves de verdad.
+**/node_modules
+**/dist
+apps/bot/public
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+coverage
+test-results
+backups
+instalar.sql
+.codebase-memory
+.vscode
+.idea

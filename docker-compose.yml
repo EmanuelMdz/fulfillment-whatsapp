@@ -1,0 +1,54 @@
+# Stack para un servidor propio (Contabo, Hetzner, el que sea) con Docker
+# o Portainer. Levanta las dos piezas del sistema en la misma máquina:
+#
+#   bot   el motor: panel, webhook, cola y seguimientos. Un solo proceso.
+#   waha  el puente que maneja la sesión de WhatsApp Web.
+#
+# El puente NO publica puertos: vive en la red interna del stack y solo lo
+# alcanza el bot. Es una diferencia real con el deploy en Railway, donde
+# WAHA queda expuesto a internet con su dominio. El QR se escanea desde el
+# panel del bot, así que su tablero tampoco hace falta.
+#
+# En el panel → Conexión, la URL del puente es: http://waha:3000
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Las dos únicas variables del sistema. Todo lo demás se configura
+      # desde el panel. Ver docs/SERVIDOR_PROPIO.md.
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ACCESS_TOKEN: ${SUPABASE_ACCESS_TOKEN}
+    ports:
+      # Puerto del servidor donde escucha el bot. Tu proxy (Nginx Proxy
+      # Manager, Traefik, Caddy) manda el dominio acá. Cambiá BOT_PORT si
+      # el 3000 ya está ocupado por otro stack.
+      - "${BOT_PORT:-3000}:3000"
+    depends_on:
+      - waha
+    healthcheck:
+      # /health contesta ok aunque falte configurar cosas: significa "el
+      # proceso está vivo". Si dejara de contestar, Docker lo reinicia.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  waha:
+    # Fijá el digest de la versión que probaste (waha@sha256:...) antes de
+    # ponerlo con clientes: la etiqueta latest cambia sin avisar.
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    environment:
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}
+      WHATSAPP_DEFAULT_ENGINE: ${WHATSAPP_DEFAULT_ENGINE:-WEBJS}
+      WAHA_PRINT_QR: "False"
+    volumes:
+      # La sesión de WhatsApp vive acá. Sin este volumen, cada redeploy
+      # del puente pide escanear el QR de nuevo.
+      - waha-sessions:/app/.sessions
+
+volumes:
+  waha-sessions:

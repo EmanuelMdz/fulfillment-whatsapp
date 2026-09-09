@@ -74,6 +74,7 @@ Sus seguimientos quedan cancelados.
 ## Guías
 
 - [Primeros pasos](docs/PRIMEROS_PASOS.md) y [Deploy](docs/DEPLOY.md).
+- [Servidor propio con Docker y Portainer](docs/SERVIDOR_PROPIO.md).
 - [Adaptar el agente](docs/GUIA.md) y [escribir el prompt](docs/PROMPTS.md).
 - [Pruebas](docs/PRUEBAS.md) y [Operación](docs/OPERACION.md).
 - [Desarrollar](CONTRIBUTING.md) y [estado de lanzamiento](docs/LANZAMIENTO.md).

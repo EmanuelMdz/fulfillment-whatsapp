@@ -9,6 +9,11 @@ Railway es lo recomendado. Render sirve igual; lo único que cambia es que su
 plan gratuito duerme el servicio, y un servicio dormido no manda seguimientos
 ni se da cuenta de que el número se desconectó.
 
+Si ya administrás un servidor propio, el repo también trae `Dockerfile` y
+`docker-compose.yml` para correr el motor y el puente en la misma máquina,
+con Docker o Portainer: [SERVIDOR_PROPIO.md](SERVIDOR_PROPIO.md). El paso 1
+(Supabase) es el mismo para los dos caminos.
+
 ---
 
 ## 1. Supabase — la base
