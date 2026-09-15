@@ -11,7 +11,7 @@
 | Panel sin compilar | `npm run build`, luego reiniciá este servidor | Abre el asistente o login |
 | Supabase responde 401/403 | Revisá token, proyecto y permisos en Supabase | El servidor puede consultar ese proyecto |
 | Tabla o función no encontrada | Panel → Instalar, verificar/aplicar pendientes | No quedan migraciones pendientes |
-| Se interrumpió el asistente | Refrescá el estado y reintentá con el mismo email | Si terminó, aparece login; si no, retoma sin duplicar el catálogo |
+| Se interrumpió el asistente | Refrescá el estado y reintentá con el mismo email | Si terminó, aparece login; si no, retoma sin duplicar la instalación |
 | Falló el ingreso | Email/contraseña del panel, no la contraseña de Postgres | El usuario existe en Auth y en `team_members` |
 | IA responde 401/403/404/429 | Studio → Probar clave y modelo; acceso, modelo, saldo/cuota | La prueba devuelve una respuesta |
 | WAHA responde pero no llegan mensajes | URL del webhook alcanzable desde WAHA; guardá y arrancá la sesión nuevamente | Un mensaje nuevo aparece en Conversaciones |
@@ -25,19 +25,51 @@
 No acredita una instalación completa ni garantiza que WhatsApp pueda enviar.
 La verificación de extremo a extremo es [PRUEBAS.md](PRUEBAS.md).
 
-## Actualizar sin perder el control
+## Actualizar a una versión nueva
 
-1. Anotá el commit desplegado, la versión/digest de WAHA y el proveedor/modelo.
-2. Prepará un respaldo de Supabase y registrá cómo restaurarlo. Probá la nueva
-   versión con otra base y otro número de prueba antes de usar datos reales.
-3. Revisá cambios y migraciones de la versión nueva. Si modificaste tu fork,
-   resolvé los conflictos y ejecutá `npm ci` y `npm run check`.
+Tu copia es independiente del repositorio del motor: una versión nueva no
+llega sola. Cada versión se publica en Releases, con sus cambios en
+`CHANGELOG.md` y el zip del código para comparar.
+
+1. Leé qué cambia: si trae migraciones y si toca archivos que modificaste.
+2. Anotá el commit desplegado, la versión/digest de WAHA y el proveedor/modelo.
+   Prepará un respaldo de Supabase y registrá cómo restaurarlo. Si hay datos
+   reales, probá la versión antes con otra base y otro número de prueba.
+3. Traé los cambios a tu copia. Una sola vez, conectá el repositorio del motor:
+
+   ```bash
+   git remote add motor https://github.com/EmanuelMdz/fulfillment-whatsapp.git
+   ```
+
+   Cada vez, reemplazando las versiones (la que tenés y la nueva):
+
+   ```bash
+   git fetch motor --tags
+   git diff v0.2.0 v0.3.0 | git apply --3way
+   ```
+
+   Aplica solo lo que cambió entre esas dos versiones y conserva tus cambios.
+   Si un archivo tuyo choca, Git lo marca como conflicto para resolverlo a mano.
+   Después ejecutá `npm ci` y `npm run check`.
+
+   Con una IA:
+
+   ```text
+   Traé a mi copia los cambios del motor entre v0.2.0 y v0.3.0, desde el
+   remoto "motor" (docs/OPERACION.md). Conservá mis cambios y mostrame cada
+   conflicto antes de resolverlo. Después corré npm ci y npm run check.
+   ```
+
 4. Coordiná la pausa con el negocio. Activá modo prueba o apagá el bot desde
    Studio. Lo automático encolado que quede bloqueado se marca fallido con
    motivo de cancelación; los mensajes humanos y avisos internos se conservan.
-5. Actualizá tu copia y desplegá. Con token, el arranque aplica lo pendiente.
-   Sin token, copiá el SQL del panel, pegalo en Supabase y volvé a verificar.
-6. Probá login, catálogo, un mensaje y una derivación antes de habilitar clientes.
+5. Hacé commit y push a tu copia: Railway despliega. Con token, el arranque
+   aplica las migraciones pendientes. Sin token, copiá el SQL del panel,
+   pegalo en Supabase y volvé a verificar.
+6. Probá login, un mensaje y una derivación antes de habilitar clientes.
+
+Si agregaste migraciones propias, numeralas desde `9001`: las del motor usan
+`0001` a `8999` y así una versión nueva no choca con las tuyas.
 
 Cada push a la rama conectada puede disparar un despliegue. Desactivá ese
 automatismo si necesitás una ventana de mantenimiento. Una sola réplica también
@@ -52,7 +84,7 @@ es una operación aparte y puede perder lo recibido después de ese respaldo.
 
 Guardá la base (esquema y datos), las claves en tu gestor y la sesión de WAHA.
 No guardes respaldos con datos de clientes en GitHub. El volumen de WAHA no es
-el respaldo de Supabase, y un fork del repo no contiene tus conversaciones.
+el respaldo de Supabase, y tu copia del repo no contiene tus conversaciones.
 
 En Supabase revisá **Database → Backups** según tu plan. Para una exportación
 manual seguí la [guía oficial de respaldos](https://supabase.com/docs/guides/platform/backups)

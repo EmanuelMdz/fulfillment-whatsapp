@@ -10,7 +10,7 @@ no crea pedidos ni elige un rubro.
 
 ## Primer resultado
 
-Seguí [Primeros pasos](docs/PRIMEROS_PASOS.md): duplicar → instalar →
+Seguí [Primeros pasos](docs/PRIMEROS_PASOS.md): crear tu copia → instalar →
 escribir tu prompt → probar en el simulador → conectar WhatsApp en modo prueba.
 
 ## Qué incluye
@@ -71,14 +71,19 @@ no oficial; la sesión puede desconectarse o el número sufrir bloqueos.
 La demo no usa IA ni envía mensajes; requiere Supabase y el asistente terminado.
 Sus seguimientos quedan cancelados.
 
+## Versiones
+
+Cada versión se publica en **Releases**, con lo que cambió en
+[CHANGELOG.md](CHANGELOG.md). Tu copia no se actualiza sola:
+[cómo incorporar una versión nueva](docs/OPERACION.md#actualizar-a-una-versión-nueva).
+
 ## Guías
 
 - [Primeros pasos](docs/PRIMEROS_PASOS.md) y [Deploy](docs/DEPLOY.md).
 - [Servidor propio con Docker y Portainer](docs/SERVIDOR_PROPIO.md).
 - [Adaptar el agente](docs/GUIA.md) y [escribir el prompt](docs/PROMPTS.md).
 - [Pruebas](docs/PRUEBAS.md) y [Operación](docs/OPERACION.md).
-- [Desarrollar](CONTRIBUTING.md) y [estado de lanzamiento](docs/LANZAMIENTO.md).
+- [Desarrollar](CONTRIBUTING.md) y [decisiones de diseño](docs/DECISIONES.md).
 
 El código y las tablas de catálogo/pedidos de versiones anteriores se conservan
 como material para futuras extensiones; están fuera del motor y del panel inicial.
-PLAN, PORTEO, AUDITORIA y TEMARIO son contexto histórico, no el alcance actual.

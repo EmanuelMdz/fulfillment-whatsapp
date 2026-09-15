@@ -252,4 +252,4 @@ no son teléfonos, una marca explícita para borrar y cero seguimientos activos.
 Administrar usuarios o aplicar migraciones desde el panel requiere ser dueño.
 
 **Límite.** Estas pruebas no reemplazan conectar Supabase y WAHA reales ni
-ejecutar PRUEBAS.md. Los pendientes de publicación están en LANZAMIENTO.md.
+ejecutar PRUEBAS.md.

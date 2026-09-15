@@ -27,6 +27,8 @@ etapa puede mostrar un estado en Leads; el prompt define los valores.
   existente. El código de catálogo/pedidos anterior queda como referencia,
   fuera del flujo y menú iniciales.
 - No editar migraciones ya aplicadas. Agregar la siguiente numerada.
+  Las del motor van de 0001 a 8999 y solo se agregan en el repositorio original;
+  en una copia de un negocio, las propias empiezan en 9001.
   Toda tabla nueva tiene RLS y los RPC administrativos son solo de service_role.
 - Conservar cola, pausas, secreto del webhook, controles de acceso,
   modo prueba, recepción atómica y toma de control humana.

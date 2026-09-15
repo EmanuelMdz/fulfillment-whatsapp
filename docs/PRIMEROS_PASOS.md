@@ -3,10 +3,15 @@
 El primer resultado es una conversación en el simulador guiada por tu prompt.
 Todavía no necesitás vincular WhatsApp.
 
-## 1. Duplicá el repo
+## 1. Creá tu copia
 
-En GitHub elegí **Fork → Create fork**, o **Use this template** si está habilitado.
-Confirmá que estás trabajando en tu copia.
+En GitHub, en este repositorio, tocá **Use this template → Create a new
+repository** y elegí **Private**: ahí vas a guardar tu prompt y tus cambios.
+
+No uses Fork: la copia de un repositorio público queda pública.
+
+Tu copia es independiente. Cuando se publique una versión nueva del motor, la
+incorporás vos: [Actualizar a una versión nueva](OPERACION.md#actualizar-a-una-versión-nueva).
 
 ## 2. Prepará las cuentas
 
@@ -18,7 +23,7 @@ Las variables y el modo manual están en [DEPLOY.md](DEPLOY.md).
 
 En Railway, seguí los pasos 1 y 2 de [Deploy](DEPLOY.md).
 
-En tu computadora, con Git y Node.js 24:
+Opcional, para trabajar en tu computadora con Git y Node.js 24:
 
 ```bash
 git clone URL_DE_TU_COPIA
@@ -35,8 +40,8 @@ Abrí http://localhost:3000. No levantes otro bot contra una base que ya usa Rai
 ## 4. Completá el asistente
 
 Ingresá nombre del negocio, zona horaria y tu email y contraseña.
-Para verificar que sos el dueño, pegá los últimos ocho caracteres del token
-cargado en el hosting. En modo manual, el asistente usa el código del SQL.
+Para verificar que sos el dueño, pegá el mismo token `sbp_` que cargaste en el
+hosting. En modo manual, el asistente usa el código del SQL.
 
 El panel empieza en modo prueba, sin números autorizados. No hay packs ni
 catálogo para elegir.
@@ -64,7 +69,7 @@ Opcional: `npm run demo` carga cinco ejemplos ficticios en una base ya instalada
 
 ## 7. Conectá WhatsApp
 
-Seguí los pasos 3 y 4 de [Deploy](DEPLOY.md).
+Seguí los pasos 4 y 5 de [Deploy](DEPLOY.md).
 Antes de escanear el QR del número dedicado, agregá el teléfono que hará de
 lead en **Conexión → Modo prueba**. Conservá el modo prueba durante
 [las verificaciones](PRUEBAS.md).

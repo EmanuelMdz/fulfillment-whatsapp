@@ -16,7 +16,7 @@ export { MIGRATION_REGISTRY_SQL, migrationSql } from './migrations.js'
  * `available: false` marca los que todavía no tienen código: el panel los
  * muestra como "próximamente" y no deja prenderlos. Un interruptor que
  * no hace nada es peor que no tenerlo. Cada módulo pasa a `true` el día
- * que su código entra (Tanda 3 en docs/PORTEO.md). La bandera en la
+ * que su código entra. La bandera en la
  * tabla `modules` se siembra igual según el pack: cuando el código
  * llegue, el módulo ya va a estar prendido donde corresponde.
  */

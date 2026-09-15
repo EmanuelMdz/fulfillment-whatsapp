@@ -23,9 +23,9 @@ import { describe } from '../utils/errors.js'
  * protegen solas:
  *   - /status y /sql no revelan nada que no esté en el repo.
  *   - /finish exige que NO haya usuarios todavía, y una prueba de que
- *     quien instala es el dueño: con token, los últimos caracteres del
- *     token (que él cargó en el hosting); sin token, el código que viajó
- *     adentro del SQL que pegó en su base.
+ *     quien instala es el dueño: con token, el mismo token que cargó en
+ *     el hosting; sin token, el código que viajó adentro del SQL que
+ *     pegó en su base.
  *
  * Después de instalado, /sql y /migrate siguen sirviendo para las
  * actualizaciones (con sesión, desde /api/panel/migrate).
@@ -121,13 +121,17 @@ installRoute.post('/finish', async (c) => {
     return c.json({ error: 'Esta instalación ya tiene usuarios. Entrá con el tuyo.' }, 409)
   }
 
-  // La prueba de que es el dueño.
+  // La prueba de que es el dueño. Se acepta el token completo, que es lo
+  // que el dueño acaba de copiar para pegar en el hosting, o sus últimos
+  // 8 caracteres, que pedían las guías anteriores. Tiene que ser uno de
+  // los dos exacto: un texto que solo termine igual no alcanza.
+  // El campo conserva el nombre `tokenTail` para no romper esas guías.
   const { accessToken } = loadEnv().supabase
   if (accessToken) {
-    const cola = typeof body.tokenTail === 'string' ? body.tokenTail.trim() : ''
-    if (!cola || cola !== accessToken.slice(-8)) {
+    const pegado = typeof body.tokenTail === 'string' ? body.tokenTail.trim() : ''
+    if (!pegado || (pegado !== accessToken && pegado !== accessToken.slice(-8))) {
       return c.json(
-        { error: 'Los últimos 8 caracteres no coinciden con el token de acceso cargado en el hosting.' },
+        { error: 'No coincide con el token de acceso de Supabase cargado en el hosting. Pegá el mismo token que pusiste ahí.' },
         403,
       )
     }

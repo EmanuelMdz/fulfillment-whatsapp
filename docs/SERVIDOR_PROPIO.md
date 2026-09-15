@@ -27,7 +27,7 @@ Lo que cambia respecto de Railway:
   los dos contenedores; con 4 GB compilás cómodo y te queda margen.
 - Un dominio apuntando a ese servidor y un proxy que resuelva el
   certificado (Nginx Proxy Manager, Traefik o Caddy).
-- Tu fork del repo en GitHub. Si todavía no lo tenés,
+- Tu copia del repo en GitHub. Si todavía no la tenés,
   [PRIMEROS_PASOS.md](PRIMEROS_PASOS.md).
 - El proyecto de Supabase y el token `sbp_`: es el **paso 1** de
   [DEPLOY.md](DEPLOY.md), igual para los dos caminos.
@@ -44,9 +44,12 @@ apuntado a WAHA, podés reusar ese mismo para el bot.
 
 | Campo | Valor |
 |---|---|
-| Repository URL | la de tu fork |
+| Repository URL | la de tu copia |
 | Reference | `refs/heads/main` |
 | Compose path | `docker-compose.yml` |
+
+Si tu copia es privada, activá **Authentication** en el mismo formulario, con
+tu usuario de GitHub y un token personal con permiso de lectura de ese repo.
 
 En **Environment variables**, una por una:
 
@@ -75,7 +78,7 @@ En el mismo formulario, **GitOps updates**. Dos formas:
   *Settings → Webhooks*. Se actualiza en el momento del push y no
   consulta al pedo el resto del día.
 
-Con cualquiera de las dos, cada push a tu fork reconstruye la imagen y
+Con cualquiera de las dos, cada push a tu copia reconstruye la imagen y
 reemplaza el contenedor. Si la actualización trae cambios en la base, el
 servidor los aplica al arrancar (con el token).
 
@@ -100,8 +103,8 @@ defensa es una clave en un header.
 ## 5. Instalar y conectar
 
 1. Abrí `https://bot.tudominio.com`. Las tablas ya se crearon al arrancar;
-   el asistente te pide el nombre del negocio, tu usuario y los últimos 8
-   caracteres del token.
+   el asistente te pide el nombre del negocio, tu usuario y el mismo token
+   `sbp_` que cargaste en el stack.
 2. Panel → **Conexión**:
    - **URL del puente**: `http://waha:3000` — el nombre del servicio en el
      stack, no un dominio. Así viaja por la red interna de Docker.
@@ -113,9 +116,9 @@ defensa es una clave en un header.
      pedido del navegador y le sale `http://`, porque el proxy le entrega
      el tráfico sin cifrar: el puente termina avisando a una dirección
      que redirige, y el aviso se pierde.
-3. De acá en adelante es igual que en Railway: modo prueba, arrancar la
-   sesión, escanear el QR, cargar la clave de IA. Seguí desde el **paso 4**
-   de [DEPLOY.md](DEPLOY.md).
+3. De acá en adelante es igual que en Railway: la clave de IA y el simulador
+   (**paso 3** de [DEPLOY.md](DEPLOY.md)), y después modo prueba, arrancar
+   la sesión y escanear el QR (**paso 5**).
 
 ---
 
@@ -150,8 +153,8 @@ Supabase que falta o el token que no es válido.
 
 ### Fijá la versión del puente
 
-`docker-compose.yml` trae `devlikeapro/waha:latest` para que la primera
-instalación sea fácil. Antes de ponerlo con clientes, cambiá esa línea por
-el digest de la versión que probaste (`devlikeapro/waha@sha256:...`): la
-etiqueta `latest` cambia sin avisar y una actualización del puente en el
-medio de una conversación no es algo que quieras descubrir en vivo.
+`docker-compose.yml` trae una versión fija de WAHA, la misma que indica
+[DEPLOY.md](DEPLOY.md). No la cambies por `latest`: esa etiqueta cambia sin
+avisar y una actualización del puente en el medio de una conversación no es
+algo que quieras descubrir en vivo. Para pasar a otra versión, probala antes
+con un número de prueba.

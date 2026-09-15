@@ -37,9 +37,9 @@ services:
       start_period: 40s
 
   waha:
-    # Fijá el digest de la versión que probaste (waha@sha256:...) antes de
-    # ponerlo con clientes: la etiqueta latest cambia sin avisar.
-    image: devlikeapro/waha:latest
+    # Versión fija, la misma que indica docs/DEPLOY.md: la etiqueta latest
+    # cambia sin avisar. Para cambiarla, probala antes con un número de prueba.
+    image: devlikeapro/waha:latest-2026.8.2
     restart: unless-stopped
     environment:
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}

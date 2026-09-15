@@ -43,9 +43,13 @@ No pegues archivos históricos sueltos encima de una base existente.
 | `0013_modo_prueba.sql` | Modo prueba: el bot solo le contesta a los números autorizados |
 | `0014_instalacion_segura.sql` | Finalización atómica del asistente, registro privado y modo prueba inicial |
 | `0015_recepcion_atomica.sql` | Guardar un mensaje y agendar su turno en una transacción, con deduplicación |
+| `0016_agente_generico.sql` | Agente genérico: conserva tablas históricas y prompts instalados; registro de seguimientos condicionado a que el turno siga vigente |
 
 Numeración única y correlativa. Nunca se edita una migración ya aplicada: se
-agrega la siguiente. Toda tabla nueva arranca con RLS prendida — y con su
+agrega la siguiente. El motor usa `0001` a `8999`. Las migraciones propias de
+una copia empiezan en `9001`, para que una versión nueva del motor no choque
+con ellas. Se aplican en orden de nombre, así que las propias corren después
+de las del motor en una instalación nueva. Toda tabla nueva arranca con RLS prendida — y con su
 política, salvo que la falta de política sea la decisión (como en
 `app_secrets`, que solo lee el servidor).
 

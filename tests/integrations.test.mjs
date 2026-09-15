@@ -77,8 +77,12 @@ test('instalador: validación antes de escribir y finalización con una única t
   })
   assert.equal((await finish(null)).status, 400)
   assert.equal((await finish({ ...form, tokenTail: 'incorrecto' })).status, 403)
+  // Un texto que solo termina como el token no es el token.
+  assert.equal((await finish({ ...form, tokenTail: 'sbp_otra_cosa_abcdefgh' })).status, 403)
   assert.equal((await finish({ ...form, pack: 'constructor' })).status, 400)
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0)
+  // El token completo es lo que pide la guía; los últimos 8 siguen valiendo.
+  assert.equal((await finish({ ...form, tokenTail: process.env.SUPABASE_ACCESS_TOKEN })).status, 200)
   assert.equal((await finish(form)).status, 200)
   const rpc = calls.find((c) => c.path.endsWith('finish_installation'))
   assert.deepEqual(rpc.body.catalog_rows, [])

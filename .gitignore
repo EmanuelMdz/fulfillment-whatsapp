@@ -13,3 +13,7 @@ instalar.sql
 .DS_Store
 .vscode/
 .idea/
+
+# Documentos internos del autor: quedan en su computadora y no viajan en las
+# copias que se crean desde este repositorio.
+docs/internos/

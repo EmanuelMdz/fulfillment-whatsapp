@@ -11,7 +11,7 @@ import { Button, Card, Field, Input, Notice, Select, Textarea } from '../ui'
  * Con el token de acceso de Supabase cargado en el hosting (lo normal),
  * las tablas se crearon solas al arrancar el servidor y acá quedan dos
  * pasos: el negocio y el usuario. La prueba de que quien instala es el
- * dueño son los últimos caracteres de ese token, que él mismo cargó.
+ * dueño es volver a pegar ese token, que él mismo cargó en el hosting.
  *
  * Sin token, aparece un paso más: copiar un SQL y pegarlo en el editor
  * de Supabase. Ese SQL trae un código de instalación al azar que queda
@@ -296,14 +296,15 @@ export default function Instalar({ onListo }) {
                 </div>
                 {auto && (
                   <Field
-                    label="Para confirmar que sos vos: los últimos 8 caracteres del token de acceso (SUPABASE_ACCESS_TOKEN) que cargaste en el hosting"
-                    className="sm:max-w-xs"
+                    label="Para confirmar que sos vos: pegá el token de Supabase (sbp_…) que cargaste en el hosting"
+                    hint="Así nadie que encuentre esta dirección antes que vos puede quedarse con el panel. No se guarda."
                   >
+                    {/* Oculto como una contraseña: la instalación suele grabarse o compartirse en pantalla. */}
                     <Input
+                      type="password"
                       value={form.tokenTail}
                       onChange={(e) => setForm({ ...form, tokenTail: e.target.value })}
                       autoComplete="off"
-                      maxLength={8}
                       required
                     />
                   </Field>
@@ -328,7 +329,7 @@ export default function Instalar({ onListo }) {
           <Card title={listo ? 'Instalado' : 'Todo al día'}>
             <p className="text-[13.5px] text-ink-2">
               {listo
-                ? 'El panel está listo. Lo que sigue: entrá, conectá el número en Conexión y cargá la clave de IA en Studio.'
+                ? 'El panel está listo. Lo que sigue: en Studio cargá la clave de IA y probá tu prompt en Probar el bot; después conectá el número en Conexión.'
                 : 'La base no tiene cambios pendientes.'}
             </p>
             {onListo && (

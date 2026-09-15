@@ -35,6 +35,10 @@ GitHub Actions repite los controles en Windows y Linux. Esto no reemplaza las
 | Valores iniciales y extensiones históricas | `packages/core/src/` |
 | Base | Nueva migración numerada en `packages/db/migrations/` |
 
+Las migraciones del motor usan `0001` a `8999` y llegan con cada versión.
+En tu copia, las propias empiezan en `9001` (`9001_mi_tabla.sql`): así una
+versión nueva del motor no trae otro archivo con el mismo número que el tuyo.
+
 Nunca edites una migración ya aplicada. Los generadores de SQL del servidor y
 la terminal comparten el registro: una migración y su marca se confirman juntas;
 repetir el paquete omite lo aplicado. Toda tabla nueva tiene RLS y todo RPC
