@@ -46,7 +46,11 @@ const DIGITOS_A_COMPARAR = 8
 export function isTestNumber(chatId: string, numeros: string[]): boolean {
   // Los grupos (@g.us) tienen un id que no es un teléfono; que no
   // coincida con nada es lo correcto.
-  if (!/^\d+@c\.us$/.test(chatId)) return false
+  //
+  // Los `@lid` SÍ entran: WhatsApp identifica así a mucha gente y ese
+  // identificador no es un teléfono, pero el dueño puede pegarlo en la
+  // lista cuando el puente no sabe traducirlo (ver esLid más abajo).
+  if (!/^\d+@(c\.us|lid)$/.test(chatId)) return false
   const delChat = soloDigitos(chatId.split('@')[0] ?? chatId)
   if (delChat.length < DIGITOS_A_COMPARAR) return false
   const finalDelChat = delChat.slice(-DIGITOS_A_COMPARAR)
@@ -59,8 +63,22 @@ export function isTestNumber(chatId: string, numeros: string[]): boolean {
 }
 
 /**
+ * ¿Este chat llegó identificado con un `@lid` en vez de un teléfono?
+ *
+ * WhatsApp lo hace cada vez más seguido para no exponer el número. Como
+ * la lista del panel tiene teléfonos, quien recibe uno de estos tiene que
+ * pedirle al puente la traducción antes de dejar callado al bot.
+ */
+export function esLid(chatId: string): boolean {
+  return /^\d+@lid$/.test(chatId)
+}
+
+/**
  * ¿El bot puede contestarle a este chat? Con el modo prueba apagado,
  * siempre. Con el modo prendido, solo a los números de la lista.
+ *
+ * Ojo: con un `@lid` esto compara el identificador, no el teléfono. Quien
+ * llama tiene que resolverlo antes (ver routes/webhook.ts).
  */
 export function botPuedeResponder(config: AppConfig, chatId: string): boolean {
   if (chatId.startsWith('demo:')) return false

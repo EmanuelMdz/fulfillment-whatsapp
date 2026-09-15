@@ -1,4 +1,5 @@
 import { ensureWebhookSecret, getSettings, hasWhatsapp } from '../config/settings.js'
+import { describe } from '../utils/errors.js'
 import type { InboundMessage, MessageProvider } from './types.js'
 
 /**
@@ -33,6 +34,18 @@ interface WahaEnvelope {
 class WahaError extends Error {
   constructor(readonly status: number, message: string) { super(message) }
 }
+
+/**
+ * Traducciones de `@lid` a teléfono ya consultadas.
+ *
+ * Sin esto, cada mensaje de una conversación con modo prueba prendido
+ * sería una consulta más al puente. El mapeo no cambia nunca; que el
+ * puente TODAVÍA no lo conozca sí cambia en cuanto el negocio agenda el
+ * contacto, así que ese caso se recuerda por poco tiempo.
+ */
+const lidCache = new Map<string, { pn: string | null; hasta: number }>()
+const CACHE_ACIERTO_MS = 24 * 60 * 60 * 1000
+const CACHE_FALLO_MS = 5 * 60 * 1000
 
 export class WahaProvider implements MessageProvider {
   readonly channel = 'whatsapp' as const
@@ -95,6 +108,43 @@ export class WahaProvider implements MessageProvider {
   async stopTyping(chatId: string): Promise<void> {
     const { session } = await this.cfg()
     await this.call('/api/stopTyping', { session, chatId })
+  }
+
+  /**
+   * El teléfono que hay detrás de un identificador `@lid`.
+   *
+   * WhatsApp dejó de mandar el teléfono en muchos mensajes: manda un
+   * identificador interno (`240402204463351@lid`). El modo prueba compara
+   * teléfonos, así que sin esta traducción no reconoce al número
+   * autorizado y el bot se queda callado con quien SÍ tenía permiso.
+   *
+   * Devuelve null cuando el puente no conoce el mapeo — pasa si ese
+   * contacto no está agendado en el teléfono del negocio. En ese caso el
+   * modo prueba compara contra el propio identificador, que el dueño
+   * puede pegar en la lista.
+   */
+  async resolveLid(lid: string): Promise<string | null> {
+    const enCache = lidCache.get(lid)
+    if (enCache && enCache.hasta > Date.now()) return enCache.pn
+
+    const { session } = await this.cfg()
+    let pn: string | null = null
+    try {
+      const res = await this.call<{ pn?: string | null }>(
+        `/api/${encodeURIComponent(session)}/lids/${encodeURIComponent(lid)}`,
+        undefined,
+        'GET',
+      )
+      pn = typeof res?.pn === 'string' ? res.pn : null
+    } catch (err) {
+      // Que el puente no sepa traducir no puede frenar la recepción: el
+      // mensaje ya llegó y hay que guardarlo igual.
+      console.warn('[waha] no se pudo traducir el identificador @lid:', describe(err))
+    }
+    // Un mapeo no cambia; que no exista sí puede cambiar en cuanto el
+    // negocio agenda el contacto, así que ese caso se reintenta antes.
+    lidCache.set(lid, { pn, hasta: Date.now() + (pn ? CACHE_ACIERTO_MS : CACHE_FALLO_MS) })
+    return pn
   }
 
   async sessionStatus(): Promise<{ status: string }> {

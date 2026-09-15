@@ -282,9 +282,27 @@ panelRoute.post('/test-followups', async (c) => {
 
 // ── Conexión de WhatsApp (sesión + QR) ───────────────────────
 
+/**
+ * La dirección pública de este panel, para armar la URL del webhook.
+ *
+ * La configurada en el panel manda. Si no hay, se deduce del pedido —
+ * pero detrás de un proxy (Railway, Render, Nginx) el servidor recibe el
+ * tráfico en http aunque el navegador esté en https. Sin mirar
+ * `x-forwarded-proto`, el webhook queda registrado en http, el proxy
+ * responde una redirección y el puente pierde cada mensaje: llegan al
+ * panel, nunca al webhook.
+ */
+function urlPublica(publicUrl: string, reqUrl: string, proto?: string): string {
+  if (publicUrl) return publicUrl.replace(/\/+$/, '')
+  const url = new URL(reqUrl)
+  const declarado = proto?.split(',')[0]?.trim()
+  if (declarado === 'https' || declarado === 'http') url.protocol = `${declarado}:`
+  return url.origin
+}
+
 panelRoute.get('/session', async (c) => {
   const s = await getSettings()
-  const base = s.publicUrl || new URL(c.req.url).origin
+  const base = urlPublica(s.publicUrl, c.req.url, c.req.header('x-forwarded-proto'))
   const extra = { public_url: s.publicUrl || null, webhook: `${base}/webhook/whatsapp` }
   if (!hasWhatsapp(s)) {
     return c.json({ configured: false, status: 'SIN_CONFIGURAR', ...extra })
@@ -304,7 +322,7 @@ panelRoute.post('/session/start', async (c) => {
   }
   // La URL del webhook: la pública si se conoce; si no, el origen de esta
   // misma request (en el hosting es el dominio público del deploy).
-  const base = s.publicUrl || new URL(c.req.url).origin
+  const base = urlPublica(s.publicUrl, c.req.url, c.req.header('x-forwarded-proto'))
   const webhookUrl = `${base}/webhook/whatsapp`
   try {
     await whatsapp().startSession(webhookUrl)

@@ -16,7 +16,8 @@
 | IA responde 401/403/404/429 | Studio → Probar clave y modelo; acceso, modelo, saldo/cuota | La prueba devuelve una respuesta |
 | WAHA responde pero no llegan mensajes | URL del webhook alcanzable desde WAHA; guardá y arrancá la sesión nuevamente | Un mensaje nuevo aparece en Conversaciones |
 | Llegan mensajes pero no responde | Bot prendido, clave de IA, modo prueba, teléfono autorizado y espera configurada | Por defecto espera 90 segundos para agrupar mensajes |
-| El teléfono llega como `@lid` | El modo prueba requiere un teléfono identificable `@c.us`; revisá motor/versión WAHA | Verificá la identidad antes de autorizarlo; no desactives el filtro para sortearlo |
+| El teléfono llega como `@lid` | El bot le pide al puente la traducción a teléfono; si no la conoce, agendá ese contacto en el teléfono del negocio o pegá el código `@lid` en los números autorizados | El bot le responde al número autorizado con el modo prueba prendido |
+| WAHA recibe el mensaje pero no aparece en el panel | En los registros de WAHA, la línea `Configuring webhooks for…`: tiene que decir `https://`. Si dice `http://`, cargá la URL pública en Conexión → Avanzado y reiniciá la sesión | El webhook queda en https y los mensajes entran |
 | Un chat de demo no permite enviar | Es el comportamiento esperado | Usá Probar el bot o un teléfono de prueba real |
 | Cada redeploy pide QR | WAHA debe conservar `/app/.sessions` en un volumen | La sesión sobrevive al reinicio del contenedor |
 | No llegan avisos | Studio → grupo del equipo; sesión conectada | La prueba de derivación deja un caso y un aviso |

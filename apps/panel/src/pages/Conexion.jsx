@@ -263,7 +263,7 @@ export default function Conexion() {
               </p>
               <Field
                 label="Números autorizados, uno por línea"
-                hint="Como los escribís normalmente: 099 123 456 o +598 99 123 456. Da igual el formato."
+                hint="Como los escribís normalmente: 099 123 456 o +598 99 123 456. Da igual el formato. WhatsApp identifica a algunas personas con un código interno en vez del teléfono: el bot le pide la traducción al puente, así que alcanza con el número."
               >
                 <Textarea
                   className="min-h-24 font-mono text-[13px]"
@@ -310,7 +310,9 @@ export default function Conexion() {
               </Notice>
             )}
 
-            {estado?.configured && !conectado && (
+            {/* También con la sesión conectada: reiniciarla es la forma de
+                volver a registrar el webhook cuando cambió la URL pública. */}
+            {estado?.configured && (
               <div className="mt-4">
                 <Button
                   variant="primary"

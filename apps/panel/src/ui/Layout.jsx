@@ -264,8 +264,8 @@ export default function Layout() {
                 </Button>
               }
             >
-              <strong>El número está desconectado: el bot no puede contestar.</strong> Los mensajes que lleguen se
-              guardan, pero nadie los responde hasta que vuelvas a escanear el código.
+              <strong>El número no está conectado: el bot no puede contestar.</strong> Los mensajes que lleguen se
+              guardan, pero nadie los responde hasta que vincules el número en Conexión.
             </Notice>
           )}
 

@@ -27,6 +27,23 @@ Sin publicar todavía.
 - WAHA fijado en `devlikeapro/waha:latest-2026.8.2` en las guías y en
   `docker-compose.yml`.
 
+**Corregido en el ensayo de instalación**
+
+- **Modo prueba con identificadores `@lid`.** WhatsApp identifica a mucha
+  gente con un código interno en vez del teléfono. El bot le pide la
+  traducción al puente antes de decidir, así que la lista sigue siendo de
+  teléfonos. Si el puente no conoce la traducción, vale pegar ese código.
+- **Webhook en https detrás de un proxy.** El servidor recibe el tráfico
+  en http aunque el navegador use https; el webhook quedaba registrado en
+  http, el proxy respondía una redirección y los mensajes no llegaban al
+  panel. Ahora se usa `x-forwarded-proto`.
+- **Reiniciar la sesión con el número conectado.** El botón solo aparecía
+  con la sesión caída, y es justo lo que hace falta para volver a
+  registrar el webhook después de cambiar la URL pública.
+- Textos del panel: el cartel de número sin conectar ya no dice "volvé a
+  escanear" en una instalación nueva, y el modo prueba no menciona un
+  catálogo que esta versión no tiene.
+
 **Base de datos**
 
 Migraciones `0001` a `0016`. Las propias de cada copia empiezan en `9001`.

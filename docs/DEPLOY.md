@@ -102,10 +102,14 @@ El puente es el servicio que maneja la sesión de WhatsApp Web. Va en el
    La primera es la que después pegás en el panel. La segunda protege el
    tablero propio de WAHA, que queda publicado en su dominio aunque no lo uses:
    el QR se escanea desde tu panel. El motor `WEBJS` ya es el predeterminado.
-3. **Settings → Volumes → Add Volume** → mount path `/app/.sessions`.
+3. **Volumen**, antes de desplegar: botón derecho sobre la tarjeta del
+   servicio en el lienzo → **Attach Volume** → mount path `/app/.sessions`.
    **Sin esto, cada redeploy del puente pide escanear el QR de nuevo.**
-4. **Settings → Networking → Generate Domain**. Cuando pregunte el puerto:
-   **3000**.
+4. Tocá **Deploy** y esperá a que el servicio quede activo. Recién con un
+   despliegue hecho, Railway puede darte un dominio.
+5. **Settings → Networking → Generate Domain**. Cuando pregunte el puerto:
+   **8080**, que es donde WAHA escucha en Railway. Confirmalo en sus
+   registros: dice `WhatsApp HTTP API is running on: http://…:PUERTO`.
    Este servicio usa la imagen Docker; no lleva `npm start`, el build del
    repo ni las variables de Supabase.
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { getSettings } from '../config/settings.js'
-import { botPuedeResponder } from '../config/test-mode.js'
+import { botPuedeResponder, esLid } from '../config/test-mode.js'
 import { describe } from '../utils/errors.js'
 import { logEvent } from '../observability/events.js'
 import { whatsapp } from '../providers/waha.js'
@@ -25,6 +25,26 @@ import {
  * índice de external_id permiten reintentos sin perder ni duplicar turnos.
  */
 export const webhookRoute = new Hono()
+
+/**
+ * ¿El bot puede contestarle a este chat?
+ *
+ * Con el modo prueba prendido hay una vuelta de más: WhatsApp identifica
+ * a mucha gente con un `@lid` en vez de su teléfono, y la lista del panel
+ * tiene teléfonos. Antes de dejar callado al bot con alguien que SÍ está
+ * autorizado, le pedimos al puente la traducción. Si el puente no la
+ * conoce (el contacto no está agendado en el teléfono del negocio), vale
+ * el identificador tal cual: el dueño puede pegarlo en la lista.
+ */
+async function puedeResponder(
+  s: Awaited<ReturnType<typeof getSettings>>,
+  chatId: string,
+): Promise<boolean> {
+  if (botPuedeResponder(s.config, chatId)) return true
+  if (!s.config.test_mode || !esLid(chatId)) return false
+  const telefono = await whatsapp().resolveLid?.(chatId)
+  return Boolean(telefono) && botPuedeResponder(s.config, telefono as string)
+}
 
 webhookRoute.post('/', async (c) => {
   const s = await getSettings()
@@ -90,7 +110,7 @@ webhookRoute.post('/', async (c) => {
     }
 
     // ── Mensaje del cliente ──────────────────────────────────
-    const permitido = botPuedeResponder(s.config, mensaje.chatId)
+    const permitido = await puedeResponder(s, mensaje.chatId)
     const guardado = await receiveCustomerMessage({
       conversationId: conversacion.id,
       externalId: mensaje.externalId,

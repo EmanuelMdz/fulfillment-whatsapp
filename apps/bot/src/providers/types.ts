@@ -47,4 +47,12 @@ export interface MessageProvider {
   sessionStatus(): Promise<{ status: string }>
   /** Traduce lo que llegó por el webhook. Devuelve null si no interesa. */
   parseWebhook(payload: unknown): InboundMessage | null
+  /**
+   * El teléfono detrás de un identificador interno del canal, si el
+   * puente lo conoce. WhatsApp manda `@lid` en vez del teléfono cada vez
+   * más seguido, y el modo prueba necesita el teléfono para reconocer al
+   * número autorizado. Opcional: un canal que siempre manda el teléfono
+   * no lo implementa.
+   */
+  resolveLid?(id: string): Promise<string | null>
 }

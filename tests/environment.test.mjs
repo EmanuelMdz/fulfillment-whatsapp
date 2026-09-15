@@ -14,7 +14,10 @@ test('el diagnóstico detecta placeholders, acepta modo manual y no revela secre
 test('modo prueba: formatos locales, lista vacía, grupos y destinos demo', () => {
   assert.equal(isTestNumber('59899123456@c.us', ['099 123 456']), true)
   assert.equal(isTestNumber('59899123456@g.us', ['099 123 456']), false)
-  assert.equal(isTestNumber('59899123456@lid', ['099 123 456']), false)
+  // Un @lid no es un teléfono, pero el dueño puede pegarlo en la lista
+  // cuando el puente no sabe traducirlo.
+  assert.equal(isTestNumber('240402204463351@lid', ['240402204463351']), true)
+  assert.equal(isTestNumber('240402204463351@lid', ['099 123 456']), false)
   assert.equal(botPuedeResponder({ test_mode: true, test_numbers: [] }, '59899123456@c.us'), false)
   assert.equal(botPuedeResponder({ test_mode: false }, 'demo:11'), false)
 })

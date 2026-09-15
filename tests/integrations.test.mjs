@@ -132,6 +132,23 @@ test('webhook exige secreto y comunica fallos de persistencia para que WAHA rein
   await new Promise((resolve) => setImmediate(resolve))
 })
 
+test('modo prueba: un identificador @lid se traduce al teléfono autorizado antes de callar al bot', async () => {
+  const calls = simulate((c) => {
+    if (c.path === '/rest/v1/app_config') return json({ ...config, test_mode: true, test_numbers: ['099 123 456'] })
+    if (c.path === '/rest/v1/conversations') return json({ id: 'chat-id', state: 'bot', chat_id: '240402204463351@lid' })
+    if (c.path === '/api/default/lids/240402204463351%40lid') return json({ lid: '240402204463351@lid', pn: '59899123456@c.us' })
+    if (c.path.endsWith('/receive_customer_message')) return json(true)
+    if (c.path.endsWith('/schedule_turn') || c.path === '/rest/v1/event_log') return json(null)
+  })
+  const event = { event: 'message', payload: { id: 'mensaje-lid', from: '240402204463351@lid', body: 'hola' } }
+  const res = await webhookRoute.request('/?secret=test-webhook', { method: 'POST', body: JSON.stringify(event) })
+  assert.equal(res.status, 200, await res.clone().text())
+  // Sin traducir, el filtro compararía "240402204463351" contra un
+  // teléfono y dejaría al bot callado con quien sí estaba autorizado.
+  assert.ok(calls.some((c) => c.path.startsWith('/api/default/lids/')))
+  assert.equal(calls.find((c) => c.path.endsWith('/receive_customer_message')).body.can_respond, true)
+})
+
 test('la ficha valida datos y actualiza una etapa libre por el mismo merge del agente', async () => {
   const id = '00000000-0000-4000-8000-000000000010'
   const calls = simulate((c) => {
